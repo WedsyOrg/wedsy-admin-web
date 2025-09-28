@@ -1,0 +1,82 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  font-family: Montserrat;
+  /* color: rgb(var(--foreground-rgb)); */
+  color: rgb(0, 0, 0);
+  background: white;
+}
+
+#sidebar > div {
+  background-color: white;
+}
+
+/* Scrollbar CSS */
+/* Width and color of the scrollbar track */
+::-webkit-scrollbar {
+  width: 8px; /* You can adjust the width */
+}
+
+/* Background of the scrollbar track */
+::-webkit-scrollbar-track {
+  background: #dedede; /* Change the background color */
+}
+
+/* Color and radius of the scrollbar handle */
+::-webkit-scrollbar-thumb {
+  background: #840032; /* Change the handle color */
+  border-radius: 5px; /* Adjust the handle's border radius */
+}
+
+/* Display on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #840032; /* Change the handle color on hover */
+}
+
+/* Hide Scrollbar */
+.hide-scrollbar::-webkit-scrollbar {
+  width: 0;
+}
+.hide-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 0;
+}
+.hide-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: transparent;
+}
+
+/* Tailwind No Scrollbar */
+@layer utilities {
+  @variants responsive {
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+      -ms-overflow-style: none; /* IE and Edge */
+      scrollbar-width: none; /* Firefox */
+    }
+  }
+}
