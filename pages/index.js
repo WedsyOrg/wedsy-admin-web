@@ -1,8 +1,8 @@
 import { MdPeople } from "react-icons/md";
 import { BiChevronDown, BiChevronUp, BiDollar } from "react-icons/bi";
-import { BsArrowUp, BsChevronDown, BsChevronUp } from "react-icons/bs";
+import { BsArrowUp, BsChevronDown, BsChevronUp, BsSearch } from "react-icons/bs";
 import { useEffect, useState } from "react";
-import { Spinner } from "flowbite-react";
+import { Spinner, TextInput } from "flowbite-react";
 
 export default function Home({ user }) {
   const [loading, setLoading] = useState(true);
@@ -15,6 +15,21 @@ export default function Home({ user }) {
     new: 0,
   });
   const [eventsPendingApproval, setEventsPendingApproval] = useState(0);
+  
+  // NEW: Additional lead status counts
+  const [hotLeadsCount, setHotLeadsCount] = useState(0);
+  const [potentialLeadsCount, setPotentialLeadsCount] = useState(0);
+  const [coldLeadsCount, setColdLeadsCount] = useState(0);
+  
+  // NEW: Task counts
+  const [tasksTodayCount, setTasksTodayCount] = useState(0);
+  const [tasksTotalCount, setTasksTotalCount] = useState(0);
+  
+  // NEW: Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
   const fetchLeadStats = () => {
     return new Promise((resolve, reject) => {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry?stats=true`, {
@@ -35,6 +50,75 @@ export default function Home({ user }) {
         });
     });
   };
+  // NEW: Fetch lead counts by status (Hot, Potential, Cold)
+  const fetchLeadCountsByStatus = () => {
+    const fetchCount = (status) => {
+      return fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/enquiry?page=1&limit=1000&status=${status}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      )
+        .then((response) => response.json())
+        .then((response) => {
+          // Return count based on list length or use totalPages if available
+          return response.list ? response.list.length : 0;
+        })
+        .catch((error) => {
+          console.error(`Error fetching ${status} leads:`, error);
+          return 0;
+        });
+    };
+
+    return Promise.all([
+      fetchCount("Hot").then((count) => setHotLeadsCount(count)),
+      fetchCount("Potential").then((count) => setPotentialLeadsCount(count)),
+      fetchCount("Cold").then((count) => setColdLeadsCount(count)),
+    ]);
+  };
+
+  // NEW: Fetch tasks
+  const fetchTasks = () => {
+    return new Promise((resolve, reject) => {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/task`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+        .then((response) => response.json())
+        .then((response) => {
+          const list = Array.isArray(response) ? response : [];
+          const total = list.length;
+
+          // Count tasks due today
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const todayEnd = new Date(today);
+          todayEnd.setHours(23, 59, 59, 999);
+
+          const todayCount = list.filter((task) => {
+            if (!task.deadline) return false;
+            const taskDate = new Date(task.deadline);
+            return taskDate >= today && taskDate <= todayEnd;
+          }).length;
+
+          setTasksTotalCount(total);
+          setTasksTodayCount(todayCount);
+          resolve();
+        })
+        .catch((error) => {
+          console.error("There was a problem with the fetch operation:", error);
+          reject();
+        });
+    });
+  };
+
   const fetchPendingEventStats = () => {
     return new Promise((resolve, reject) => {
       fetch(`${process.env.NEXT_PUBLIC_API_URL}/event?stats=pending_approval`, {
@@ -55,59 +139,153 @@ export default function Home({ user }) {
         });
     });
   };
+
+  // Debounce search to avoid too many API calls
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim() === "") {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSearchLoading(true);
+      fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/enquiry?page=1&limit=10&search=${encodeURIComponent(searchQuery)}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      )
+        .then((response) => response.json())
+        .then((response) => {
+          setSearchResults(response.list || []);
+          setSearchLoading(false);
+        })
+        .catch((error) => {
+          console.error("There was a problem with the search operation:", error);
+          setSearchResults([]);
+          setSearchLoading(false);
+        });
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchLeadStats(), fetchPendingEventStats()]).then((r) =>
-      setLoading(false)
-    );
+    Promise.all([
+      fetchLeadStats(),
+      fetchPendingEventStats(),
+      fetchTasks(),
+      fetchLeadCountsByStatus(),
+    ]).then(() => setLoading(false));
   }, []);
+
+  // NEW: Generic stat box component matching the design
+  const StatBox = ({ label, value }) => (
+    <div className="bg-white rounded-2xl shadow-lg px-6 py-4 flex flex-col items-center justify-center min-w-[140px]">
+      <p className="text-sm font-medium text-gray-600">{label}</p>
+      <p className="text-4xl font-bold mt-2">
+        {loading ? <Spinner size="sm" /> : value}
+      </p>
+    </div>
+  );
+
   return (
     <>
       <div className="p-8 flex flex-col gap-6">
-        <div>
+        {/* Header with greeting and search */}
+        <div className="flex flex-row justify-between items-center gap-4">
           <h2 className="text-2xl font-semibold">
             Hello {user.name} {"👋🏼,"}
           </h2>
-        </div>
-        <div className="bg-white rounded-3xl shadow-lg p-6 flex flex-row gap-2">
-          <div className="bg-gradient-to-b from-pink-500 to-white rounded-full p-3">
-            <MdPeople size={48} color="#840032" />
+          <div className="relative max-w-xs pr-10">
+            <TextInput
+              icon={BsSearch}
+              id="search"
+              placeholder="Search"
+              type="search"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+              }}
+              className="w-full bg-white"
+            />
+            {/* Search Results Dropdown (optional - can be enhanced later) */}
+            {searchQuery && searchResults.length > 0 && (
+              <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-lg border border-gray-200 max-h-96 overflow-y-auto">
+                {searchLoading ? (
+                  <div className="p-4 flex justify-center">
+                    <Spinner size="sm" />
+                  </div>
+                ) : (
+                  <div className="p-2">
+                    {searchResults.map((lead) => (
+                      <div
+                        key={lead._id}
+                        className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
+                        onClick={() => {
+                          // Navigate to individual lead detail page
+                          window.location.href = `/leads/${lead._id}`;
+                        }}
+                      >
+                        <p className="font-medium text-gray-900">{lead.name}</p>
+                        {lead.phone && (
+                          <p className="text-sm text-gray-500">{lead.phone}</p>
+                        )}
+                        {lead.email && (
+                          <p className="text-sm text-gray-500">{lead.email}</p>
+                        )}
+                      </div>
+                    ))}
+                    {searchResults.length >= 10 && (
+                      <div
+                        className="p-3 text-center text-sm text-blue-600 hover:bg-gray-50 rounded-lg cursor-pointer"
+                        onClick={() => {
+                          window.location.href = `/leads?search=${encodeURIComponent(searchQuery)}`;
+                        }}
+                      >
+                        View all results →
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {searchQuery && searchResults.length === 0 && !searchLoading && (
+              <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-4 text-center text-gray-500">
+                No results found
+              </div>
+            )}
           </div>
-          <div className="flex flex-row flex-grow">
-            <div className="flex flex-col gap-1 mx-auto">
-              <p className="">Fresh leads</p>
-              <p className="text-4xl font-bold">
-                {loading ? <Spinner /> : <>{leadStats.fresh}</>}
-              </p>
-            </div>
-            <div className="w-[2px] h-full bg-zinc-100" />
-            <div className="flex flex-col gap-1 mx-auto">
-              <p className="">New leads</p>
-              <p className="text-4xl font-bold">
-                {loading ? <Spinner /> : <>{leadStats.new}</>}
-              </p>
-            </div>
-            <div className="w-[2px] h-full bg-zinc-100" />
-            <div className="flex flex-col gap-1 mx-auto">
-              <p className="">Interested leads</p>
-              <p className="text-4xl font-bold">
-                {loading ? <Spinner /> : <>{leadStats.interested}</>}
-              </p>
-            </div>
-            <div className="w-[2px] h-full bg-zinc-100" />
-            <div className="flex flex-col gap-1 mx-auto">
-              <p className="">Lost leads</p>
-              <p className="text-4xl font-bold">
-                {loading ? <Spinner /> : <>{leadStats.lost}</>}
-              </p>
-            </div>
-            <div className="w-[2px] h-full bg-zinc-100" />
-            <div className="flex flex-col gap-1 mx-auto">
-              <p className="">Total</p>
-              <p className="text-4xl font-bold">
-                {loading ? <Spinner /> : <>{leadStats.total}</>}
-              </p>
-            </div>
+        </div>
+
+        {/* --- TODAY SECTION --- */}
+        <div className="flex flex-col gap-4">
+          <p className="text-sm font-semibold text-gray-700 uppercase">
+            Today
+          </p>
+          <div className="flex flex-row gap-4 flex-wrap">
+            <StatBox label="Fresh Leads" value={leadStats.fresh} />
+            <StatBox label="Follow Ups" value={leadStats.interested} />
+            <StatBox label="Tasks" value={tasksTodayCount} />
+          </div>
+        </div>
+
+        {/* --- TOTAL SECTION --- */}
+        <div className="flex flex-col gap-4">
+          <p className="text-sm font-semibold text-gray-700 uppercase">
+            Total
+          </p>
+          <div className="flex flex-row gap-4 flex-wrap">
+            <StatBox label="Hot Lead" value={hotLeadsCount} />
+            <StatBox label="Potential Lead" value={potentialLeadsCount} />
+            <StatBox label="Cold Lead" value={coldLeadsCount} />
+            <StatBox label="Lost leads" value={leadStats.lost} />
+            <StatBox label="Booked" value={leadStats.interested} />
+            <StatBox label="Super hot" value={hotLeadsCount} />
           </div>
         </div>
         <div className="flex flex-row gap-4">
