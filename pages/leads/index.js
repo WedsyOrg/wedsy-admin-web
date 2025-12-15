@@ -12,7 +12,9 @@ import {
   BsChevronUp,
   BsPlus,
   BsSearch,
+  BsXCircle,
 } from "react-icons/bs";
+import { HiOutlineUserAdd } from "react-icons/hi";
 import { useEffect, useState } from "react";
 import {
   Badge,
@@ -46,16 +48,70 @@ export default function Leads({ user }) {
     name: "",
     phone: "",
   });
+  
+  // NEW: Tab state
+  const [activeTab, setActiveTab] = useState("ALL");
+  
+  // NEW: Additional filter states (client-side for now, until backend supports)
+  const [interestedService, setInterestedService] = useState("");
+  const [eventCreated, setEventCreated] = useState("");
+  const [eventMonth, setEventMonth] = useState("");
+  const [bidRequest, setBidRequest] = useState("");
+  const [storeAccess, setStoreAccess] = useState("");
+  
+  // NEW: Filter states to track if filters are applied
+  const [appliedFilters, setAppliedFilters] = useState({
+    source: "",
+    status: "",
+    date: "",
+    interestedService: "",
+    eventCreated: "",
+    eventMonth: "",
+    bidRequest: "",
+    storeAccess: "",
+  });
   const fetchList = () => {
     setLoading(true);
+    
+    // Build query params - using appliedFilters for backend-supported filters
+    let queryParams = `page=${page || 1}&limit=${itemsPerPage}`;
+    if (sort) queryParams += `&sort=${sort}`;
+    if (search) queryParams += `&search=${encodeURIComponent(search)}`;
+    if (appliedFilters.source)
+      queryParams += `&source=${encodeURIComponent(appliedFilters.source)}`;
+    if (appliedFilters.date) queryParams += `&date=${appliedFilters.date}`;
+    if (appliedFilters.status)
+      queryParams += `&status=${encodeURIComponent(appliedFilters.status)}`;
+
+    // NEW: backend-supported filters for additional fields
+    if (appliedFilters.interestedService) {
+      queryParams += `&service=${encodeURIComponent(
+        appliedFilters.interestedService
+      )}`;
+    }
+    if (appliedFilters.eventCreated) {
+      queryParams += `&eventCreated=${encodeURIComponent(
+        appliedFilters.eventCreated
+      )}`;
+    }
+    if (appliedFilters.eventMonth && appliedFilters.eventMonth !== "All months") {
+      queryParams += `&eventMonth=${encodeURIComponent(
+        appliedFilters.eventMonth
+      )}`;
+    }
+    if (appliedFilters.bidRequest) {
+      queryParams += `&bidRequest=${encodeURIComponent(
+        appliedFilters.bidRequest
+      )}`;
+    }
+    if (appliedFilters.storeAccess) {
+      queryParams += `&storeAccess=${encodeURIComponent(
+        appliedFilters.storeAccess
+      )}`;
+    }
+    
     fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/enquiry?page=${
-        page || 1
-      }&limit=${itemsPerPage}${sort && `&sort=${sort}`}${
-        search && `&search=${search}`
-      }${source && `&source=${source}`}${date && `&date=${date}`}${
-        status && `&status=${status}`
-      }`,
+      `${process.env.NEXT_PUBLIC_API_URL}/enquiry?${queryParams}`,
       {
         method: "GET",
         headers: {
@@ -67,12 +123,45 @@ export default function Leads({ user }) {
       .then((response) => response.json())
       .then((response) => {
         setLoading(false);
-        setList(response.list);
-        setTotalPages(response.totalPages);
+        let filteredList = response.list || [];
+        
+        // Client-side filtering for filters not yet supported by backend
+        // This can be removed once backend supports these filters
+        if (appliedFilters.interestedService) {
+          // Filter by interested service (if data exists in additionalInfo)
+          filteredList = filteredList.filter((lead) => {
+            const service = lead.additionalInfo?.interestedService || lead.additionalInfo?.service || "";
+            return service.toLowerCase().includes(appliedFilters.interestedService.toLowerCase());
+          });
+        }
+        
+        if (appliedFilters.eventCreated) {
+          // Filter by event created - would need user.events data
+          // For now, this is a placeholder that would need backend support
+          // filteredList = filteredList.filter((lead) => {
+          //   return appliedFilters.eventCreated === "Yes" 
+          //     ? lead.user?.events?.length > 0 
+          //     : !lead.user?.events?.length;
+          // });
+        }
+        
+        if (appliedFilters.bidRequest) {
+          // Filter by bid request - would need bidding/order data
+          // Placeholder for future backend support
+        }
+        
+        if (appliedFilters.storeAccess) {
+          // Filter by store access - related to userCreated
+          // This would need backend support to properly filter
+        }
+        
+        setList(filteredList);
+        setTotalPages(response.totalPages || 1);
         setSelected([]);
       })
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
       });
   };
   const markInterested = () => {
@@ -173,13 +262,89 @@ export default function Leads({ user }) {
   useEffect(() => {
     fetchList();
   }, [page]);
+  // NEW: Apply filters function
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      source: source,
+      status: status,
+      date: date,
+      interestedService: interestedService,
+      eventCreated: eventCreated,
+      eventMonth: eventMonth,
+      bidRequest: bidRequest,
+      storeAccess: storeAccess,
+    });
+    if (page === 1) {
+      fetchList();
+    } else {
+      setPage(1);
+    }
+  };
+  
+  // NEW: Reset filters function
+  const handleResetFilters = () => {
+    setSource("");
+    setDate("");
+    setStatus("");
+    setInterestedService("");
+    setEventCreated("");
+    setEventMonth("");
+    setBidRequest("");
+    setStoreAccess("");
+    setAppliedFilters({
+      source: "",
+      status: "",
+      date: "",
+      interestedService: "",
+      eventCreated: "",
+      eventMonth: "",
+      bidRequest: "",
+      storeAccess: "",
+    });
+    if (page === 1) {
+      fetchList();
+    } else {
+      setPage(1);
+    }
+  };
+
+  // NEW: Handle tab clicks for ALL / DECOR / MAKEUP
+  const handleTabClick = (tab) => {
+    setActiveTab(tab);
+
+    let service = "";
+    if (tab === "DECOR") {
+      service = "Decor";
+    } else if (tab === "MAKEUP") {
+      service = "Makeup";
+    }
+
+    // Update visible dropdown state
+    setInterestedService(service);
+
+    // Update applied filters so fetchList() can use client-side service filter
+    setAppliedFilters((prev) => ({
+      ...prev,
+      interestedService: service,
+    }));
+  };
+  
   useEffect(() => {
     if (page === 1) {
       fetchList();
     } else {
       setPage(1);
     }
-  }, [itemsPerPage, source, date, search, sort, status]);
+  }, [itemsPerPage, search, sort]);
+  
+  // Update when appliedFilters change
+  useEffect(() => {
+    if (page === 1) {
+      fetchList();
+    } else {
+      setPage(1);
+    }
+  }, [appliedFilters]);
   return (
     <>
       <Modal
@@ -237,121 +402,246 @@ export default function Leads({ user }) {
         </Modal.Body>
       </Modal>
       <div className="p-8 flex flex-col gap-6">
-        <div className="flex flex-col gap-2">
+        {/* Top Tabs: ALL, DECOR, MAKEUP */}
+        <div className="flex flex-row gap-4">
+          <button
+            onClick={() => handleTabClick("ALL")}
+            className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
+              activeTab === "ALL"
+                ? "bg-black text-white"
+                : "bg-white text-black border border-gray-300"
+            }`}
+          >
+            ALL
+          </button>
+          <button
+            onClick={() => handleTabClick("DECOR")}
+            className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
+              activeTab === "DECOR"
+                ? "bg-black text-white"
+                : "bg-white text-black border border-gray-300"
+            }`}
+          >
+            DECOR
+          </button>
+          <button
+            onClick={() => handleTabClick("MAKEUP")}
+            className={`px-8 py-3 rounded-lg font-semibold transition-colors ${
+              activeTab === "MAKEUP"
+                ? "bg-black text-white"
+                : "bg-white text-black border border-gray-300"
+            }`}
+          >
+            MAKEUP
+          </button>
+        </div>
+        
+        {/* Filter by Section */}
+        <div className=" flex flex-col gap-4">
           <p className="font-semibold text-lg">Filter by:</p>
-          <div className="flex flex-row gap-6">
-            <Select
-              value={source}
-              onChange={(e) => {
-                setSource(e.target.value);
-              }}
+          
+          {/* First Row of Filters */}
+          <div className="grid grid-cols-7 gap-4">
+            <div className="flex flex-col gap-1">
+              <Select
+                value={source}
+                onChange={(e) => {
+                  setSource(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Source</option>
+                {[
+                  "Landing Screen",
+                  "Landing Page | Speak to Expert",
+                  "Decor Landing Page",
+                  "Admin Dashboard",
+                ].map((item, index) => (
+                  <option value={item} key={index}>
+                    {item}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <Select
+                value={interestedService}
+                onChange={(e) => {
+                  setInterestedService(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Interested Service</option>
+                <option value="Decor">Decor</option>
+                <option value="Makeup">Makeup</option>
+                <option value="Photography">Photography</option>
+                <option value="Catering">Catering</option>
+                <option value="Venue">Venue</option>
+              </Select>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <Select
+                value={eventCreated}
+                onChange={(e) => {
+                  setEventCreated(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Event created</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </Select>
+              <p className="text-xs text-gray-400 mt-1">Yes/No</p>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <Select
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Select Status</option>
+                <option value={"Fresh"}>Fresh: New lead(past 24hrs)</option>
+                <option value={"New"}>New: leads(past week)</option>
+                <option value={"Hot"}>Hot: Event within 8 weeks</option>
+                <option value={"Potential"}>Potential: Event in 8 - 20 weeks</option>
+                <option value={"Cold"}>Cold: Event beyond 20 weeks</option>
+                <option value={"Lost"}>Lost: Waste/Dummy Lead</option>
+                <option value={"Interested"}>Interested: Useful Leads</option>
+                <option value={"Verified"}>Verified: Verified by OTP</option>
+                <option value={"NotVerified"}>Not Verified</option>
+              </Select>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <Select
+                value={eventMonth}
+                onChange={(e) => {
+                  setEventMonth(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Event Month</option>
+                <option value="All months">All months</option>
+                <option value="January">January</option>
+                <option value="February">February</option>
+                <option value="March">March</option>
+                <option value="April">April</option>
+                <option value="May">May</option>
+                <option value="June">June</option>
+                <option value="July">July</option>
+                <option value="August">August</option>
+                <option value="September">September</option>
+                <option value="October">October</option>
+                <option value="November">November</option>
+                <option value="December">December</option>
+              </Select>
+              <p className="text-xs text-gray-400 mt-1">All months</p>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <Select
+                value={bidRequest}
+                onChange={(e) => {
+                  setBidRequest(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Bid request</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </Select>
+              <p className="text-xs text-gray-400 mt-1">Yes/No</p>
+            </div>
+            
+            <div className="flex flex-col gap-1">
+              <Select
+                value={storeAccess}
+                onChange={(e) => {
+                  setStoreAccess(e.target.value);
+                }}
+                disabled={loading}
+                className="w-full"
+              >
+                <option value={""}>Store Access</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </Select>
+              <p className="text-xs text-gray-400 mt-1">Yes/No</p>
+            </div>
+          </div>
+          
+          {/* Apply and Reset Buttons */}
+          <div className="flex flex-row gap-4">
+            <Button
+              color="success"
+              onClick={handleApplyFilters}
               disabled={loading}
+              className="bg-green-600 hover:bg-green-700"
             >
-              <option value={""}>Select Source</option>
-              {[
-                "Landing Screen",
-                "Landing Page | Speak to Expert",
-                "Decor Landing Page",
-                "Admin Dashboard",
-              ].map((item, index) => (
-                <option value={item} key={index}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-            {/* <Select id="">
-              <option value={""}>Event Tool</option>
-              <option>Canada</option>
-              <option>France</option>
-              <option>Germany</option>
-            </Select> */}
-            <Select
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-              }}
-              disabled={loading}
-            >
-              <option value={""}>Select Status</option>
-              <option value={"Fresh"}>Fresh: New lead(past 24hrs)</option>
-              <option value={"New"}>New: leads(past week)</option>
-              <option value={"Hot"}>Hot: Event within 8 weeks</option>
-              <option value={"Potential"}>
-                Potential: Event in 8 - 20 weeks
-              </option>
-              <option value={"Cold"}>Cold: Event beyond 20 weeks</option>
-              <option value={"Lost"}>Lost: Waste/Dummy Lead</option>
-              <option value={"Interested"}>Interested: Useful Leads</option>
-              <option value={"Verified"}>Verified: Verified by OTP</option>
-              <option value={"NotVerified"}>Not Verified</option>
-            </Select>
-            <TextInput
-              type="date"
-              placeholder="Date"
-              value={date}
-              onChange={(e) => {
-                console.log(e.target.value);
-                setDate(e.target.value);
-              }}
-              disabled={loading}
-            />
+              Apply
+            </Button>
             <Button
               color="dark"
-              onClick={() => {
-                setSearch("");
-                setSort("");
-                setItemsPerPage(10);
-                setDate("");
-                setSource("");
-                setStatus("");
-              }}
+              onClick={handleResetFilters}
               disabled={loading}
             >
               Reset
             </Button>
           </div>
+        </div>
+        
+        {/* Actions Section */}
+        <div className="flex flex-col gap-4">
           <p className="font-semibold text-lg">Actions:</p>
-          <div className="flex flex-row gap-6">
-            <Tooltip content="Mark as Lost">
-              <Button
-                disabled={selected.length == 0 || loading}
-                color="light"
-                onClick={() => {
-                  if (selected.length == 0) {
-                    alert("Please select at least one lead");
-                  } else {
-                    markLost();
-                  }
-                }}
-              >
-                <MdDoNotDisturbAlt className="mr-2 h-5 w-5" />
-                <p>Change Status</p>
-              </Button>
-            </Tooltip>
-            <Tooltip content="Mark as Interested">
-              <Button
-                disabled={selected.length == 0 || loading}
-                color="light"
-                onClick={() => {
-                  if (selected.length == 0) {
-                    alert("Please select at least one lead");
-                  } else {
-                    markInterested();
-                  }
-                }}
-              >
-                <BsSearch className="mr-2 h-5 w-5" />
-                <p>Move to prospect</p>
-              </Button>
-            </Tooltip>
-            <Button color="light" disabled={true}>
-              <BiUser className="mr-2 h-5 w-5" />
-              <p>Assign</p>
+          <div className="flex flex-row gap-4 flex-wrap items-center">
+            <Button
+              disabled={selected.length == 0 || loading}
+              color="light"
+              onClick={() => {
+                if (selected.length == 0) {
+                  alert("Please select at least one lead");
+                } else {
+                  // Open modal or dropdown for status change
+                  markLost();
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <BsXCircle className="h-5 w-5" />
+              Change status
             </Button>
-            <Button color="light" disabled={true}>
-              <BsArrowDownLeft className="mr-2 h-5 w-5" />
-              <p>Import</p>
+            
+            <div className="flex flex-col">
+              <Button
+                disabled={true}
+                color="light"
+                className="flex items-center gap-2"
+              >
+                <BiUser className="h-5 w-5" />
+                Assign
+              </Button>
+            </div>
+            
+            <Button
+              disabled={true}
+              color="light"
+              className="flex items-center gap-2"
+            >
+              <BsArrowDownLeft className="h-5 w-5" />
+              Import
             </Button>
+            
             <Button
               color="light"
               disabled={loading}
@@ -359,27 +649,49 @@ export default function Leads({ user }) {
                 setIsAddLeadModalOpen(true);
                 setAddLeadData({ name: "", phone: "" });
               }}
+              className="flex items-center gap-2"
             >
-              <BsPlus className="mr-2 h-5 w-5" />
-              <p>Add Lead</p>
+              <BsPlus className="h-5 w-5" />
+              Create lead +
             </Button>
-            <Tooltip content="Delete Lead">
+            
+            <Button
+              disabled={selected.length == 0 || loading}
+              color="light"
+              onClick={() => {
+                if (selected.length == 0) {
+                  alert("Please select at least one lead");
+                } else if (confirm("Do you want to delete the Leads?")) {
+                  deleteLeads();
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <MdDelete className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          {/* Apply button for Actions (if needed based on design) */}
+          {selected.length > 0 && (
+            <div className="flex flex-row gap-4">
               <Button
-                disabled={selected.length == 0 || loading}
-                color="light"
+                color="success"
                 onClick={() => {
                   if (selected.length == 0) {
                     alert("Please select at least one lead");
-                  } else if (confirm("Do you want to delete the Leads?")) {
-                    deleteLeads();
+                  } else {
+                    markInterested();
                   }
                 }}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700"
               >
-                <MdDelete className="h-5 w-5" />
+                Apply
               </Button>
-            </Tooltip>
-          </div>
+            </div>
+          )}
         </div>
+        
         <div className="bg-white rounded-3xl flex-col flex gap-3 shadow-xl">
           <div className="flex flex-row justify-between items-center pt-4 px-12">
             <div className="flex flex-col">

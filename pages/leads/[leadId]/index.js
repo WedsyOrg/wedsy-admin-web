@@ -4,6 +4,7 @@ import {
   Button,
   Checkbox,
   Label,
+  Modal,
   Select,
   Table,
   TextInput,
@@ -29,6 +30,24 @@ import {
   MdClose,
 } from "react-icons/md";
 import { MdPayments } from "react-icons/md";
+// NEW (lead details header): icon used for the "block user" action, matching the given design
+import { CircleAlert } from "lucide-react";
+
+// STATIC: Base interest options shown as chips in the Interests section.
+// Custom interests added by the user are merged with this list at runtime.
+const BASE_INTEREST_OPTIONS = [
+  "Venue",
+  "Decor",
+  "Catering",
+  "Makeup",
+  "Photography",
+  "DJ",
+  "Mehendi",
+  "Gift Packing",
+  "Choreographer",
+  "Car rental",
+  "Cake",
+];
 
 export default function Leads({ message, setMessage }) {
   const router = useRouter();
@@ -36,6 +55,10 @@ export default function Leads({ message, setMessage }) {
   const [display, setDisplay] = useState("Account Status");
   const [lead, setLead] = useState({});
   const [conversation, setConversation] = useState("");
+  const [noteDateTime, setNoteDateTime] = useState("");
+  // Notes editing (Previous Notes): per-note drafts keyed by noteId so inputs are immediately editable
+  const [activeNoteId, setActiveNoteId] = useState(null);
+  const [noteEdits, setNoteEdits] = useState({}); // { [noteId]: { text, dateTime, originalText, originalDateTime } }
   const [notes, setNotes] = useState("");
   const [callSchedule, setCallSchedule] = useState("");
   const [loading, setLoading] = useState(false);
@@ -74,6 +97,79 @@ export default function Leads({ message, setMessage }) {
     venue: "",
     time: "",
   });
+  // Lead status (New / Hot / Warm / Closed / Lost) derived from the existing API response
+  const [leadStatus, setLeadStatus] = useState("");
+  // NEW: Follow ups / Tasks state for this lead.
+  // Backed by the existing Task model (category + referenceId) on the server.
+  const [followUps, setFollowUps] = useState([]); // category = "Lead-FollowUp", referenceId = leadId
+  const [leadTasks, setLeadTasks] = useState([]); // category = "Lead-Task", referenceId = leadId
+  const [newFollowUpText, setNewFollowUpText] = useState("");
+  const [newFollowUpDateTime, setNewFollowUpDateTime] = useState("");
+  const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskDateTime, setNewTaskDateTime] = useState("");
+  // NEW: selection + UI state for follow up / task history + modals
+  const [selectedFollowUpId, setSelectedFollowUpId] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [followUpHistoryOpen, setFollowUpHistoryOpen] = useState(false);
+  const [taskHistoryOpen, setTaskHistoryOpen] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  // NEW: Interests section state (chips below Follow ups / Tasks)
+  // Persisted on the lead under additionalInfo.interests as an array of strings.
+  const [interests, setInterests] = useState([]);
+  const [customInterest, setCustomInterest] = useState("");
+  const [showCustomInterestInput, setShowCustomInterestInput] = useState(false);
+  // NEW: local UI state for the mid-page summary boxes (Status / Decor / Makeup / Client budget)
+  // These values are always computed from / persisted to the backend; no existing fields are changed.
+  const [storeAccess, setStoreAccess] = useState(false);
+  const [biddingStatus, setBiddingStatus] = useState("No Bid");
+  const [wedsyPackageStatus, setWedsyPackageStatus] = useState("No Activity");
+  const [vendorPackageStatus, setVendorPackageStatus] =
+    useState("No Activity");
+  const [clientBudget, setClientBudget] = useState("");
+  const [clientBudgetNotes, setClientBudgetNotes] = useState("");
+  // Controls the Edit / Update flow for client budget inputs (read-only until "Edit" is clicked)
+  const [budgetEditMode, setBudgetEditMode] = useState(false);
+
+  const computeLeadStatus = (tempLead) => {
+    if (!tempLead) return "";
+
+    if (tempLead.isLost) return "Lost";
+
+    if (
+      tempLead.paymentStats &&
+      typeof tempLead.paymentStats.amountDue === "number" &&
+      tempLead.paymentStats.amountDue === 0 &&
+      tempLead.paymentStats.totalAmount > 0
+    ) {
+      return "Closed";
+    }
+
+    const events = tempLead.events || [];
+    let earliestDate = null;
+    events.forEach((evt) => {
+      (evt.eventDays || []).forEach((day) => {
+        if (day.date) {
+          const d = new Date(day.date);
+          if (!isNaN(d.getTime())) {
+            if (!earliestDate || d < earliestDate) {
+              earliestDate = d;
+            }
+          }
+        }
+      });
+    });
+
+    if (earliestDate) {
+      const now = new Date();
+      const diffDays = (earliestDate - now) / (1000 * 60 * 60 * 24);
+      const diffWeeks = diffDays / 7;
+      if (diffWeeks <= 8) return "Hot";
+      if (diffWeeks <= 20) return "Warm";
+    }
+
+    return "New";
+  };
   const fetchLead = () => {
     setLoading(true);
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}`, {
@@ -89,12 +185,87 @@ export default function Leads({ message, setMessage }) {
         setLead(response);
         setNotes(response.updates.notes);
         setCallSchedule(response.updates.callSchedule);
+        // Drive the lead-status text box from existing lead + payment information
+        setLeadStatus(computeLeadStatus(response));
+        // Store Access comes from additionalInfo.storeAccess (boolean)
+        setStoreAccess(
+          response.additionalInfo &&
+            response.additionalInfo.storeAccess === true
+        );
+        // Makeup report boxes come from statusSummary, added in the enriched /enquiry/:id API
+        setBiddingStatus(
+          response.statusSummary?.bidding ? response.statusSummary.bidding : "No Bid"
+        );
+        setWedsyPackageStatus(
+          response.statusSummary?.wedsyPackage
+            ? response.statusSummary.wedsyPackage
+            : "No Activity"
+        );
+        setVendorPackageStatus(
+          response.statusSummary?.vendorPackage
+            ? response.statusSummary.vendorPackage
+            : "No Activity"
+        );
+        // Client approx budget (number) and notes are persisted in additionalInfo.*
+        setClientBudget(
+          response.additionalInfo?.clientBudget !== undefined &&
+            response.additionalInfo?.clientBudget !== null
+            ? String(response.additionalInfo.clientBudget)
+            : ""
+        );
+        setClientBudgetNotes(
+          response.additionalInfo?.clientBudgetNotes || ""
+        );
+        // NEW: hydrate interests chip selection from additionalInfo.interests (if present)
+        if (
+          Array.isArray(response.additionalInfo?.interests) &&
+          response.additionalInfo.interests.length > 0
+        ) {
+          setInterests(response.additionalInfo.interests);
+        } else {
+          setInterests([]);
+        }
         setUpdatedName(null);
       })
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
       });
   };
+
+  // For <input type="datetime-local" /> value: "YYYY-MM-DDTHH:mm"
+  const formatDateTimeLocal = (d) => {
+    const pad2 = (n) => String(n).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const mm = pad2(d.getMonth() + 1);
+    const dd = pad2(d.getDate());
+    const hh = pad2(d.getHours());
+    const min = pad2(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+  };
+
+  const parseDateTimeLocal = (value) => {
+    if (!value || typeof value !== "string") return null;
+    // Expected: YYYY-MM-DDTHH:mm
+    const m = value.match(
+      /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
+    );
+    if (!m) return null;
+    const yyyy = parseInt(m[1], 10);
+    const mm = parseInt(m[2], 10);
+    const dd = parseInt(m[3], 10);
+    const hh = parseInt(m[4], 10);
+    const min = parseInt(m[5], 10);
+    const d = new Date(yyyy, mm - 1, dd, hh, min, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  // Initialize editable note Date/Time once (so user edits aren't overwritten each render)
+  useEffect(() => {
+    if (!noteDateTime) {
+      setNoteDateTime(formatDateTimeLocal(new Date()));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const createUser = () => {
     setLoading(true);
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}/user`, {
@@ -120,8 +291,10 @@ export default function Leads({ message, setMessage }) {
         console.error("There was a problem with the fetch operation:", error);
       });
   };
-  const addConversation = () => {
+  // Create a new note (top input)
+  const createNote = () => {
     setLoading(true);
+    const parsedDate = parseDateTimeLocal(noteDateTime) || new Date();
     fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}/conversations`,
       {
@@ -130,7 +303,10 @@ export default function Leads({ message, setMessage }) {
           "Content-Type": "application/json",
           authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-        body: JSON.stringify({ conversation }),
+        body: JSON.stringify({
+          conversation,
+          createdAt: parsedDate.toISOString(),
+        }),
       }
     )
       .then((response) => response.json())
@@ -139,8 +315,12 @@ export default function Leads({ message, setMessage }) {
           setLoading(false);
           fetchLead();
           setConversation("");
+          setNoteDateTime(formatDateTimeLocal(new Date()));
+          // After creating a note, clear any previous-note edit state
+          setActiveNoteId(null);
+          setNoteEdits({});
           setMessage({
-            text: "Conversation added Successfully!",
+            text: "Note added Successfully!",
             status: "success",
             display: true,
           });
@@ -150,6 +330,57 @@ export default function Leads({ message, setMessage }) {
         console.error("There was a problem with the fetch operation:", error);
       });
   };
+
+  // Update an existing note (selected row)
+  const updateSelectedNote = () => {
+    if (!activeNoteId) return;
+    const draft = noteEdits[activeNoteId];
+    if (!draft) return;
+    setLoading(true);
+    const parsedDate = parseDateTimeLocal(draft.dateTime) || new Date();
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}/conversations/${activeNoteId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          text: draft.text,
+          createdAt: parsedDate.toISOString(),
+        }),
+      }
+    )
+      .then((response) => response.json())
+      .then((response) => {
+        if (response.message === "success") {
+          setLoading(false);
+          fetchLead();
+          // After update, clear edit mode so Update disables again (matches requested flow)
+          setActiveNoteId(null);
+          setNoteEdits({});
+          setMessage({
+            text: "Note updated Successfully!",
+            status: "success",
+            display: true,
+          });
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+      });
+  };
+
+  const isNoteDirty = (() => {
+    if (!activeNoteId) return false;
+    const d = noteEdits[activeNoteId];
+    if (!d) return false;
+    return d.text !== d.originalText || d.dateTime !== d.originalDateTime;
+  })();
   const updateNotes = () => {
     setLoading(true);
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}/notes`, {
@@ -522,9 +753,338 @@ export default function Leads({ message, setMessage }) {
         console.error("There was a problem with the fetch operation:", error);
       });
   };
+
+  const handleBlockUser = () => {
+    if (loading || !lead?.user?._id) return;
+    if (
+      !confirm(
+        "Are you sure you want to block this user? They may not be able to log in."
+      )
+    ) {
+      return;
+    }
+    setLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/user/block`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ userId: lead.user._id, blocked: true }),
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        setLoading(false);
+        if (response.message === "success") {
+          setMessage({
+            text: "User blocked successfully!",
+            status: "success",
+            display: true,
+          });
+        } else {
+          setMessage({
+            text: "Failed to block user.",
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        setMessage({
+          text: "Error while blocking user.",
+          status: "failure",
+          display: true,
+        });
+      });
+  };
+
+  // Helper to PATCH `additionalInfo` fields on a lead without touching any existing behaviour.
+  // Used only by the new Status / Decor / Makeup / Client budget UI on this page.
+  const updateAdditionalInfo = (updates) => {
+    if (!leadId) return;
+    setLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}/`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ additionalInfoUpdates: updates }),
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        setLoading(false);
+        if (response.message === "success") {
+          fetchLead();
+          setMessage({
+            text: "Updated successfully!",
+            status: "success",
+            display: true,
+          });
+        } else {
+          setMessage({
+            text: "Failed to update details.",
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        setMessage({
+          text: "Error while updating details.",
+          status: "failure",
+          display: true,
+        });
+      });
+  };
+
+  const handleToggleStoreAccess = () => {
+    const next = !storeAccess;
+    setStoreAccess(next);
+    updateAdditionalInfo({ storeAccess: next });
+  };
+
+  const handleUpdateBudget = () => {
+    const numericBudget =
+      clientBudget && !isNaN(Number(clientBudget))
+        ? Number(clientBudget)
+        : 0;
+    updateAdditionalInfo({
+      clientBudget: numericBudget,
+      clientBudgetNotes,
+    });
+    setBudgetEditMode(false);
+  };
+
+  // NEW: Toggle a single interest in/out of the selected list.
+  const toggleInterest = (label) => {
+    setInterests((prev) =>
+      prev.includes(label)
+        ? prev.filter((item) => item !== label)
+        : [...prev, label]
+    );
+  };
+
+  // NEW: Persist selected interests to backend via additionalInfo.interests.
+  const handleSaveInterests = () => {
+    updateAdditionalInfo({ interests });
+  };
+
+  // Placeholder: send greeting message (UI only for now)
+  const handleSendGreeting = () => {
+    if (loading) return;
+    setMessage({
+      text: "Greeting message sent (placeholder).",
+      status: "success",
+      display: true,
+    });
+  };
+
+  // NEW: Fetch all follow ups and tasks for this lead using the existing /task API.
+  // We distinguish them by Task.category and tie them to the lead via referenceId = leadId.
+  const fetchLeadTasksAndFollowUps = () => {
+    if (!leadId) return;
+
+    const baseUrl = `${process.env.NEXT_PUBLIC_API_URL}/task`;
+    const headers = {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${localStorage.getItem("token")}`,
+    };
+
+    // Fetch follow ups and tasks in parallel without touching the global loading flag
+    Promise.all([
+      fetch(`${baseUrl}?category=Lead-FollowUp&referenceId=${leadId}`, {
+        method: "GET",
+        headers,
+      })
+        .then((res) => res.json())
+        .catch((error) => {
+          console.error("Error fetching follow ups:", error);
+          return [];
+        }),
+      fetch(`${baseUrl}?category=Lead-Task&referenceId=${leadId}`, {
+        method: "GET",
+        headers,
+      })
+        .then((res) => res.json())
+        .catch((error) => {
+          console.error("Error fetching tasks:", error);
+          return [];
+        }),
+    ])
+      .then(([followUpsResponse, tasksResponse]) => {
+        // Guard against unexpected responses to avoid breaking the page
+        const sortedFollowUps = Array.isArray(followUpsResponse)
+          ? [...followUpsResponse].sort(
+              (a, b) => new Date(b.deadline) - new Date(a.deadline)
+            )
+          : [];
+        const sortedTasks = Array.isArray(tasksResponse)
+          ? [...tasksResponse].sort(
+              (a, b) => new Date(b.deadline) - new Date(a.deadline)
+            )
+          : [];
+
+        setFollowUps(sortedFollowUps);
+        setLeadTasks(sortedTasks);
+
+        // Default selection to the most recent item in each list
+        setSelectedFollowUpId(sortedFollowUps[0]?._id || null);
+        setSelectedTaskId(sortedTasks[0]?._id || null);
+      })
+      .catch((error) => {
+        console.error("Error in fetchLeadTasksAndFollowUps:", error);
+      });
+  };
+
+  // NEW: Create a follow up entry (category="Lead-FollowUp") for this lead.
+  const handleCreateFollowUp = () => {
+    if (!newFollowUpText || !newFollowUpDateTime || !leadId) return;
+
+    setLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/task`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        category: "Lead-FollowUp",
+        task: newFollowUpText,
+        deadline: newFollowUpDateTime, // Mongoose will parse this into a Date
+        referenceId: leadId,
+      }),
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        setLoading(false);
+        if (response.message === "success") {
+          setNewFollowUpText("");
+          setNewFollowUpDateTime("");
+          fetchLeadTasksAndFollowUps();
+          setMessage({
+            text: "Follow up created successfully!",
+            status: "success",
+            display: true,
+          });
+        } else {
+          setMessage({
+            text: "Failed to create follow up.",
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Error creating follow up:", error);
+        setLoading(false);
+        setMessage({
+          text: "Error while creating follow up.",
+          status: "failure",
+          display: true,
+        });
+      });
+  };
+
+  // NEW: Create a task entry (category="Lead-Task") for this lead.
+  const handleCreateLeadTask = () => {
+    if (!newTaskText || !newTaskDateTime || !leadId) return;
+
+    setLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/task`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        category: "Lead-Task",
+        task: newTaskText,
+        deadline: newTaskDateTime,
+        referenceId: leadId,
+      }),
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        setLoading(false);
+        if (response.message === "success") {
+          setNewTaskText("");
+          setNewTaskDateTime("");
+          fetchLeadTasksAndFollowUps();
+          setMessage({
+            text: "Task created successfully!",
+            status: "success",
+            display: true,
+          });
+        } else {
+          setMessage({
+            text: "Failed to create task.",
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Error creating task:", error);
+        setLoading(false);
+        setMessage({
+          text: "Error while creating task.",
+          status: "failure",
+          display: true,
+        });
+      });
+  };
+
+  // NEW: Mark either a follow up or a task as completed using the existing /task/:id/complete API.
+  const handleCompleteTaskItem = (taskId, type) => {
+    if (!taskId) return;
+
+    setLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/task/${taskId}/complete`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        setLoading(false);
+        if (response.message === "success") {
+          fetchLeadTasksAndFollowUps();
+          setMessage({
+            text: `${type} marked as completed!`,
+            status: "success",
+            display: true,
+          });
+        } else {
+          setMessage({
+            text: `Failed to complete ${type.toLowerCase()}.`,
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Error completing task item:", error);
+        setLoading(false);
+        setMessage({
+          text: `Error while completing ${type.toLowerCase()}.`,
+          status: "failure",
+          display: true,
+        });
+      });
+  };
+
   useEffect(() => {
     if (leadId) {
       fetchLead();
+      // NEW: also load follow ups and tasks for this lead
+      fetchLeadTasksAndFollowUps();
     }
   }, [leadId]);
   useEffect(() => {
@@ -534,8 +1094,162 @@ export default function Leads({ message, setMessage }) {
     }
   }, [displayPayment]);
 
+  // Derived selections for displaying "Previous Follow up notes" / "Previous Tasks"
+  const selectedFollowUp =
+    followUps.find((item) => item._id === selectedFollowUpId) || null;
+  const selectedTask =
+    leadTasks.find((item) => item._id === selectedTaskId) || null;
+
+  let selectedFollowUpNote = "";
+  let selectedFollowUpDate = "";
+  let selectedFollowUpTime = "";
+  if (selectedFollowUp) {
+    selectedFollowUpNote = selectedFollowUp.task || "";
+    if (selectedFollowUp.deadline) {
+      const d = new Date(selectedFollowUp.deadline);
+      if (!isNaN(d.getTime())) {
+        const day = `${d.getDate()}`.padStart(2, "0");
+        const month = `${d.getMonth() + 1}`.padStart(2, "0");
+        const year = d.getFullYear();
+        selectedFollowUpDate = `${day}-${month}-${year}`;
+        const hours = `${d.getHours()}`.padStart(2, "0");
+        const minutes = `${d.getMinutes()}`.padStart(2, "0");
+        selectedFollowUpTime = `${hours}:${minutes}`;
+      }
+    }
+  }
+
+  let selectedTaskNote = "";
+  let selectedTaskDate = "";
+  let selectedTaskTime = "";
+  if (selectedTask) {
+    selectedTaskNote = selectedTask.task || "";
+    if (selectedTask.deadline) {
+      const d = new Date(selectedTask.deadline);
+      if (!isNaN(d.getTime())) {
+        const day = `${d.getDate()}`.padStart(2, "0");
+        const month = `${d.getMonth() + 1}`.padStart(2, "0");
+        const year = d.getFullYear();
+        selectedTaskDate = `${day}-${month}-${year}`;
+        const hours = `${d.getHours()}`.padStart(2, "0");
+        const minutes = `${d.getMinutes()}`.padStart(2, "0");
+        selectedTaskTime = `${hours}:${minutes}`;
+      }
+    }
+  }
+
   return (
     <>
+      {/* NEW: Modal to create a Follow up for this lead */}
+      <Modal
+        show={showFollowUpModal}
+        size="md"
+        popup
+        onClose={() => {
+          setShowFollowUpModal(false);
+          setNewFollowUpText("");
+          setNewFollowUpDateTime("");
+        }}
+      >
+        <Modal.Header />
+        <Modal.Body>
+          <div className="space-y-4">
+            <p className="text-lg font-semibold">Create Follow up</p>
+            <TextInput
+              placeholder="Follow up note"
+              value={newFollowUpText}
+              onChange={(e) => setNewFollowUpText(e.target.value)}
+              disabled={loading}
+            />
+            <TextInput
+              type="datetime-local"
+              value={newFollowUpDateTime}
+              onChange={(e) => setNewFollowUpDateTime(e.target.value)}
+              disabled={loading}
+            />
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                color="light"
+                onClick={() => {
+                  setShowFollowUpModal(false);
+                  setNewFollowUpText("");
+                  setNewFollowUpDateTime("");
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="success"
+                onClick={() => {
+                  handleCreateFollowUp();
+                  setShowFollowUpModal(false);
+                }}
+                disabled={
+                  loading || !newFollowUpText || !newFollowUpDateTime
+                }
+              >
+                Save Follow up
+              </Button>
+            </div>
+          </div>
+        </Modal.Body>
+      </Modal>
+
+      {/* NEW: Modal to create a Task for this lead */}
+      <Modal
+        show={showTaskModal}
+        size="md"
+        popup
+        onClose={() => {
+          setShowTaskModal(false);
+          setNewTaskText("");
+          setNewTaskDateTime("");
+        }}
+      >
+        <Modal.Header />
+        <Modal.Body>
+          <div className="space-y-4">
+            <p className="text-lg font-semibold">Create Task</p>
+            <TextInput
+              placeholder="Task"
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              disabled={loading}
+            />
+            <TextInput
+              type="datetime-local"
+              value={newTaskDateTime}
+              onChange={(e) => setNewTaskDateTime(e.target.value)}
+              disabled={loading}
+            />
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                color="light"
+                onClick={() => {
+                  setShowTaskModal(false);
+                  setNewTaskText("");
+                  setNewTaskDateTime("");
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="success"
+                onClick={() => {
+                  handleCreateLeadTask();
+                  setShowTaskModal(false);
+                }}
+                disabled={loading || !newTaskText || !newTaskDateTime}
+              >
+                Save Task
+              </Button>
+            </div>
+          </div>
+        </Modal.Body>
+      </Modal>
+
       <div className="p-8 w-full">
         <div className="bg-white shadow-xl rounded-3xl p-8 w-full flex flex-col gap-4">
           <div className="flex flex-row items-center justify-between">
@@ -579,23 +1293,41 @@ export default function Leads({ message, setMessage }) {
                   />
                 </>
               )}
+              <button
+                type="button"
+                className="ml-2 p-1 hover:bg-red-50 rounded-full"
+                onClick={handleBlockUser}
+                disabled={loading || !lead.userCreated}
+                title="Block user"
+              >
+                <CircleAlert size={18} />
+              </button>
             </p>
-            <Select
-              value={display}
-              onChange={(e) => {
-                setDisplay(e.target.value);
-              }}
-              disabled={loading}
-            >
-              <option value={"Account Status"}>Account Status</option>
-              <option value={"Event Tool"} disabled={!lead.userCreated}>
-                Event Tool
-              </option>
-              {/* <option value={"Track History"}>Track History</option> */}
-              <option value={"Payment Status"} disabled={!lead.userCreated}>
-                Payment Status
-              </option>
-            </Select>
+            <div className="flex flex-row gap-3 items-center">
+              <Button
+                color="success"
+                onClick={handleSendGreeting}
+                disabled={loading}
+              >
+                Send Greeting Message
+              </Button>
+              <Select
+                value={display}
+                onChange={(e) => {
+                  setDisplay(e.target.value);
+                }}
+                disabled={loading}
+              >
+                <option value={"Account Status"}>Account Status</option>
+                <option value={"Event Tool"} disabled={!lead.userCreated}>
+                  Event Tool
+                </option>
+                {/* <option value={"Track History"}>Track History</option> */}
+                <option value={"Payment Status"} disabled={!lead.userCreated}>
+                  Payment Status
+                </option>
+              </Select>
+            </div>
           </div>
           {!loading && display === "Account Status" && (
             <>
@@ -636,36 +1368,516 @@ export default function Leads({ message, setMessage }) {
                   readOnly={true}
                   disabled={!lead.source}
                 />
+                <TextInput
+                  placeholder="Lead Status"
+                  value={leadStatus}
+                  readOnly={true}
+                  disabled={!leadStatus}
+                />
               </div>
-              <p>Status Report</p>
-              <div className="flex flex-row gap-4 -mt-2">
-                <Badge color={lead.verified ? "success" : "failure"}>
-                  {lead.verified ? "Verified" : "Not Verified"}
-                </Badge>
-                {lead.isInterested && (
-                  <Badge color={"success"}>Interested</Badge>
-                )}
-                {lead.isLost && <Badge color={"failure"}>Lost</Badge>}
-                <Badge color={lead.userCreated ? "success" : "failure"}>
-                  {lead.userCreated ? "Website Login" : "No Website Login"}
-                </Badge>
-                <Badge
-                  color={
-                    lead.userCreated
-                      ? lead.events.length > 0
-                        ? "success"
-                        : "failure"
-                      : "failure"
-                  }
-                >
-                  {lead.userCreated
-                    ? lead.events.length > 0
-                      ? "Event Created"
-                      : "Event Not Created"
-                    : "Event Not Created"}
-                </Badge>
-                <Badge color={"failure"}>Payment Not Done</Badge>
+              {/*
+                NEW mid-section layout (four columns):
+                1) Status Report (Store Access / Lead activity)
+                2) Decor Report (Onboarding, Event created, Payment status)
+                3) Makeup Report (Bidding / Wedsy package / Vendor package)
+                4) Client approx budget (budget + notes with Edit / Update actions)
+                Existing badges and follow-up sections below are left untouched.
+              */}
+              <div className="mt-4 grid grid-cols-4 gap-6">
+                {/* Status Report: matches the red/green Store Access pills from design */}
+                <div className="flex flex-col gap-3">
+                  <p className="font-medium">Status Report</p>
+                  <button
+                    type="button"
+                    onClick={handleToggleStoreAccess}
+                    disabled={loading}
+                    className={`rounded-full px-6 py-2 text-sm border ${
+                      storeAccess
+                        ? "border-green-500 text-green-500 bg-white"
+                        : "border-red-500 text-red-500 bg-white"
+                    }`}
+                  >
+                    {storeAccess ? "Store Access: Access" : "Store Access: No access"}
+                  </button>
+                  <div className="rounded-full px-6 py-2 text-sm border border-gray-200 bg-white text-gray-800">
+                    Lead activity
+                  </div>
+                </div>
+
+                {/* Decor Report: all data derived from existing userCreated / events / paymentStats */}
+                <div className="flex flex-col gap-3">
+                  <p className="font-medium">Decor Report</p>
+                  {/* Onboarding status */}
+                  <div
+                    className={`rounded-full px-6 py-2 text-sm border ${
+                      lead.userCreated
+                        ? "border-green-500 text-green-500 bg-white"
+                        : "border-red-500 text-red-500 bg-white"
+                    }`}
+                  >
+                    Onboarding Status
+                  </div>
+                  {/* Event created / not created */}
+                  <div
+                    className={`rounded-full px-6 py-2 text-sm border ${
+                      lead.events?.length > 0
+                        ? "border-green-500 text-green-500 bg-white"
+                        : "border-red-500 text-red-500 bg-white"
+                    }`}
+                  >
+                    {lead.events?.length > 0 ? "Event created" : "Event not created"}
+                  </div>
+                  {/* Payment status */}
+                  {(() => {
+                    let label = "Not paid";
+                    let color = "border-red-500 text-red-500";
+                    const stats = lead.paymentStats;
+                    if (stats && typeof stats.totalAmount === "number") {
+                      if (stats.amountPaid >= stats.totalAmount && stats.totalAmount > 0) {
+                        label = "Paid";
+                        color = "border-green-500 text-green-500";
+                      } else if (stats.amountPaid > 0) {
+                        label = "Partial paid";
+                        color = "border-orange-500 text-orange-500";
+                      }
+                    }
+                    return (
+                      <div
+                        className={`rounded-full px-6 py-2 text-sm border bg-white ${color}`}
+                      >
+                        {`Payment status: ${label}`}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Makeup Report: statuses come from backend statusSummary (bidding / package) */}
+                <div className="flex flex-col gap-3">
+                  <p className="font-medium">Makeup Report</p>
+                  {/* Bidding */}
+                  {(() => {
+                    let color = "border-gray-300 text-gray-500";
+                    if (biddingStatus === "Bid in Progress") {
+                      color = "border-orange-500 text-orange-500";
+                    } else if (biddingStatus === "Booked") {
+                      color = "border-green-500 text-green-500";
+                    }
+                    return (
+                      <div
+                        className={`rounded-full px-6 py-2 text-sm border bg-white ${color}`}
+                      >
+                        Bidding:{" "}
+                        {biddingStatus === "No Bid"
+                          ? "No Bid"
+                          : biddingStatus === "Bid in Progress"
+                          ? "Bid in Progress"
+                          : "Booked"}
+                      </div>
+                    );
+                  })()}
+                  {/* Wedsy package */}
+                  {(() => {
+                    let color = "border-gray-300 text-gray-500";
+                    if (wedsyPackageStatus === "Booked") {
+                      color = "border-green-500 text-green-500";
+                    }
+                    return (
+                      <div
+                        className={`rounded-full px-6 py-2 text-sm border bg-white ${color}`}
+                      >
+                        Wedsy package:{" "}
+                        {wedsyPackageStatus === "Booked"
+                          ? "Booked"
+                          : "No Activity"}
+                      </div>
+                    );
+                  })()}
+                  {/* Vendor package */}
+                  {(() => {
+                    let color = "border-gray-300 text-gray-500";
+                    if (vendorPackageStatus === "Booked") {
+                      color = "border-green-500 text-green-500";
+                    }
+                    return (
+                      <div
+                        className={`rounded-full px-6 py-2 text-sm border bg-white ${color}`}
+                      >
+                        Vendor package:{" "}
+                        {vendorPackageStatus === "Booked"
+                          ? "Booked"
+                          : "No Activity"}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Client approx budget: numeric budget + free-text notes */}
+                <div className="flex flex-col gap-3">
+                  <p className="font-medium">Client approx budget</p>
+                  <TextInput
+                    type="number"
+                    placeholder="Enter budget"
+                    value={clientBudget}
+                    readOnly={!budgetEditMode}
+                    onChange={(e) => setClientBudget(e.target.value)}
+                  />
+                  <Textarea
+                    rows={2}
+                    placeholder="Notes"
+                    value={clientBudgetNotes}
+                    readOnly={!budgetEditMode}
+                    onChange={(e) => setClientBudgetNotes(e.target.value)}
+                  />
+                  <div className="flex gap-3">
+                    <Button
+                      color="warning"
+                      onClick={() => setBudgetEditMode(true)}
+                      disabled={loading}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      color="success"
+                      onClick={handleUpdateBudget}
+                      disabled={loading || !budgetEditMode}
+                    >
+                      Update!
+                    </Button>
+                  </div>
+                </div>
               </div>
+
+              {/* NEW: Follow ups + Tasks section for this lead, matching the design layout */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Follow ups column */}
+                <div className="flex flex-col gap-3">
+                  <p className="font-medium">Follow ups</p>
+
+                  {/* Previous Follow up note (read-only, shows latest/selected history) */}
+                  <TextInput
+                    placeholder="Previous Follow up notes"
+                    value={selectedFollowUpNote}
+                    readOnly
+                    disabled={!selectedFollowUp}
+                  />
+
+                  {/* Previous Follow up date + time (read-only) */}
+                  <div className="flex flex-row gap-3">
+                    <TextInput
+                      placeholder="Date"
+                      value={selectedFollowUpDate}
+                      readOnly
+                      disabled={!selectedFollowUpDate}
+                    />
+                    <TextInput
+                      placeholder="Time"
+                      value={selectedFollowUpTime}
+                      readOnly
+                      disabled={!selectedFollowUpTime}
+                    />
+                  </div>
+
+                  {/* Actions: Create Follow up + View History */}
+                  <div className="flex flex-row gap-3 items-center">
+                    <Button
+                      color="gray"
+                      onClick={() => {
+                        setShowFollowUpModal(true);
+                        setNewFollowUpText("");
+                        setNewFollowUpDateTime("");
+                      }}
+                      disabled={loading}
+                      className="px-6"
+                    >
+                      + Create follow up
+                    </Button>
+
+                    <div className="relative">
+                      <Button
+                        color="light"
+                        onClick={() =>
+                          setFollowUpHistoryOpen((prev) => !prev)
+                        }
+                        disabled={loading || followUps.length === 0}
+                        className="px-6 flex items-center gap-2"
+                      >
+                        View History
+                        <BsChevronDown
+                          className={`transition-transform ${
+                            followUpHistoryOpen ? "rotate-180" : ""
+                          }`}
+                          size={16}
+                        />
+                      </Button>
+
+                      {followUpHistoryOpen && (
+                        <div className="absolute z-20 mt-2 w-80 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
+                          {followUps.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-gray-400">
+                              No follow up history
+                            </div>
+                          ) : (
+                            followUps.map((item) => {
+                              const d = item.deadline
+                                ? new Date(item.deadline)
+                                : null;
+                              const dateStr =
+                                d && !isNaN(d.getTime())
+                                  ? `${`${d.getDate()}`.padStart(
+                                      2,
+                                      "0"
+                                    )}-${`${d.getMonth() + 1}`.padStart(
+                                      2,
+                                      "0"
+                                    )}-${d.getFullYear()}`
+                                  : "-";
+                              const timeStr =
+                                d && !isNaN(d.getTime())
+                                  ? `${`${d.getHours()}`.padStart(
+                                      2,
+                                      "0"
+                                    )}:${`${d.getMinutes()}`.padStart(2, "0")}`
+                                  : "";
+                              return (
+                                <button
+                                  key={item._id}
+                                  type="button"
+                                  className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${
+                                    item._id === selectedFollowUpId
+                                      ? "bg-gray-50"
+                                      : ""
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedFollowUpId(item._id);
+                                    setFollowUpHistoryOpen(false);
+                                  }}
+                                >
+                                  <p className="font-medium text-gray-800 line-clamp-1">
+                                    {item.task}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {dateStr} {timeStr}
+                                  </p>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Tasks column */}
+                <div className="flex flex-col gap-3">
+                  <p className="font-medium">Tasks</p>
+
+                  {/* Previous Task (read-only, shows latest/selected history) */}
+                  <TextInput
+                    placeholder="Previous Tasks"
+                    value={selectedTaskNote}
+                    readOnly
+                    disabled={!selectedTask}
+                  />
+
+                  {/* Previous Task date + time (read-only) */}
+                  <div className="flex flex-row gap-3">
+                    <TextInput
+                      placeholder="Date"
+                      value={selectedTaskDate}
+                      readOnly
+                      disabled={!selectedTaskDate}
+                    />
+                    <TextInput
+                      placeholder="Time"
+                      value={selectedTaskTime}
+                      readOnly
+                      disabled={!selectedTaskTime}
+                    />
+                  </div>
+
+                  {/* Actions: Create Task + View History */}
+                  <div className="flex flex-row gap-3 items-center">
+                    <Button
+                      color="gray"
+                      onClick={() => {
+                        setShowTaskModal(true);
+                        setNewTaskText("");
+                        setNewTaskDateTime("");
+                      }}
+                      disabled={loading}
+                      className="px-6"
+                    >
+                      + Create Task
+                    </Button>
+
+                    <div className="relative">
+                      <Button
+                        color="light"
+                        onClick={() => setTaskHistoryOpen((prev) => !prev)}
+                        disabled={loading || leadTasks.length === 0}
+                        className="px-6 flex items-center gap-2"
+                      >
+                        View History
+                        <BsChevronDown
+                          className={`transition-transform ${
+                            taskHistoryOpen ? "rotate-180" : ""
+                          }`}
+                          size={16}
+                        />
+                      </Button>
+
+                      {taskHistoryOpen && (
+                        <div className="absolute z-20 mt-2 w-80 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-lg">
+                          {leadTasks.length === 0 ? (
+                            <div className="px-4 py-3 text-sm text-gray-400">
+                              No task history
+                            </div>
+                          ) : (
+                            leadTasks.map((item) => {
+                              const d = item.deadline
+                                ? new Date(item.deadline)
+                                : null;
+                              const dateStr =
+                                d && !isNaN(d.getTime())
+                                  ? `${`${d.getDate()}`.padStart(
+                                      2,
+                                      "0"
+                                    )}-${`${d.getMonth() + 1}`.padStart(
+                                      2,
+                                      "0"
+                                    )}-${d.getFullYear()}`
+                                  : "-";
+                              const timeStr =
+                                d && !isNaN(d.getTime())
+                                  ? `${`${d.getHours()}`.padStart(
+                                      2,
+                                      "0"
+                                    )}:${`${d.getMinutes()}`.padStart(2, "0")}`
+                                  : "";
+                              return (
+                                <button
+                                  key={item._id}
+                                  type="button"
+                                  className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 ${
+                                    item._id === selectedTaskId
+                                      ? "bg-gray-50"
+                                      : ""
+                                  }`}
+                                  onClick={() => {
+                                    setSelectedTaskId(item._id);
+                                    setTaskHistoryOpen(false);
+                                  }}
+                                >
+                                  <p className="font-medium text-gray-800 line-clamp-1">
+                                    {item.task}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {dateStr} {timeStr}
+                                  </p>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* NEW: Interests section – selectable chips matching the provided design */}
+              <div className="mt-10 flex flex-col gap-4">
+                <p className="font-medium">Interests</p>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    ...BASE_INTEREST_OPTIONS,
+                    // Ensure any custom interests that are not part of the base list
+                    // are still visible as chips.
+                    ...interests.filter(
+                      (label) => !BASE_INTEREST_OPTIONS.includes(label)
+                    ),
+                  ].map((label) => {
+                    const selected = interests.includes(label);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => toggleInterest(label)}
+                        className={`px-6 py-2 rounded-full border text-sm transition-colors ${
+                          selected
+                            ? "bg-[#920036] text-white border-[#920036]"
+                            : "bg-white text-gray-800 border-gray-300"
+                        }`}
+                        disabled={loading}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+
+                  {/* Custom interest chip */}
+                  {showCustomInterestInput ? (
+                    <div className="flex flex-row items-center gap-2">
+                      <TextInput
+                        placeholder="Type Custom interest"
+                        value={customInterest}
+                        onChange={(e) => setCustomInterest(e.target.value)}
+                        disabled={loading}
+                      />
+                      <Button
+                        color="success"
+                        size="xs"
+                        onClick={() => {
+                          const trimmed = customInterest.trim();
+                          if (trimmed) {
+                            toggleInterest(trimmed);
+                          }
+                          setCustomInterest("");
+                          setShowCustomInterestInput(false);
+                        }}
+                        disabled={loading || !customInterest.trim()}
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        color="light"
+                        size="xs"
+                        onClick={() => {
+                          setCustomInterest("");
+                          setShowCustomInterestInput(false);
+                        }}
+                        disabled={loading}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomInterestInput(true)}
+                      className="px-6 py-2 rounded-full border text-sm bg-white text-gray-800 border-gray-400"
+                      disabled={loading}
+                    >
+                      + Type Custom interest
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-2">
+                  <Button
+                    color="success"
+                    className="px-8 bg-green-600 hover:bg-green-700"
+                    onClick={handleSaveInterests}
+                    disabled={loading}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              {/* Existing action buttons (Create User / Mark Interested / Mark Lost / Delete Lead) */}
               <div className="flex flex-row gap-4 -mt-2">
                 {!lead.userCreated && (
                   <Button
@@ -774,78 +1986,176 @@ export default function Leads({ message, setMessage }) {
                   ))}
                 </>
               )}
-              <p>Client updates</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="flex flex-col gap-3">
-                  {lead.updates?.conversations?.map((item, index) => (
-                    <Textarea
-                      rows={2}
-                      value={item}
-                      key={index}
-                      readOnly
-                      disabled
-                      className="disabled:opacity-100"
+              <div className="w-full">
+                <div className="text-lg font-semibold mb-4">Notes</div>
+
+                <div className="flex items-center gap-4 mb-5">
+                  <button
+                    type="button"
+                    disabled={loading || !conversation}
+                    onClick={createNote}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700"
+                  >
+                    <BsPlus size={16} />
+                    Create Note
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={loading || !isNoteDirty}
+                    onClick={updateSelectedNote}
+                    className="inline-flex items-center rounded-lg bg-green-600 px-8 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Update!
+                  </button>
+                </div>
+
+                <div className="border-b border-gray-200 mb-6" />
+
+                <div className="grid grid-cols-12 gap-6 items-start mb-8">
+                  <div className="col-span-12 md:col-span-9">
+                    <input
+                      value={conversation}
+                      onChange={(e) => setConversation(e.target.value)}
+                      placeholder="This is notes"
+                      className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 shadow-sm focus:border-gray-300 focus:ring-0"
                     />
-                  ))}
-                  <Textarea
-                    rows={3}
-                    value={conversation}
-                    onChange={(e) => {
-                      setConversation(e.target.value);
-                    }}
-                    placeholder="Add Notes"
-                  />
-                  <Button
-                    color="success"
-                    disabled={!conversation}
-                    onClick={addConversation}
-                  >
-                    Update Conversation
-                  </Button>
+                  </div>
+                  <div className="col-span-12 md:col-span-3">
+                    <input
+                      type="datetime-local"
+                      value={noteDateTime}
+                      onChange={(e) => setNoteDateTime(e.target.value)}
+                      className="w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 shadow-sm focus:border-gray-300 focus:ring-0"
+                    />
+                  </div>
                 </div>
-                <div className="flex flex-col gap-3">
-                  <Textarea
-                    rows={5}
-                    value={notes}
-                    onChange={(e) => {
-                      setNotes(e.target.value);
-                    }}
-                    placeholder="Add Notes"
-                  />
-                  <Button
-                    color="success"
-                    disabled={!notes}
-                    onClick={updateNotes}
-                  >
-                    Update Notes
-                  </Button>
+
+                <div className="grid grid-cols-12 gap-6 items-center mb-3">
+                  <div className="col-span-12 md:col-span-9 text-sm font-semibold text-gray-900">
+                    Previous Notes
+                  </div>
+                  <div className="col-span-12 md:col-span-3 text-sm font-semibold text-gray-900">
+                    Date/Time
+                  </div>
                 </div>
-                <div className="flex flex-col gap-3">
-                  <p>Schedule Next Call</p>
-                  <TextInput
-                    type="datetime-local"
-                    value={
-                      callSchedule
-                        ? new Date(
-                            new Date(callSchedule).getTime() +
-                              new Date().getTimezoneOffset() * -60 * 1000
-                          )
-                            .toISOString()
-                            .slice(0, 16)
-                        : ""
-                    }
-                    onChange={(e) => {
-                      setCallSchedule(e.target.value);
-                    }}
-                    placeholder="Call Schedule"
-                  />
-                  <Button
-                    color="success"
-                    disabled={!callSchedule}
-                    onClick={updateCallSchedule}
-                  >
-                    Update Schedule
-                  </Button>
+
+                <div className="flex flex-col gap-4">
+                  {lead.updates?.conversations?.length > 0 ? (
+                    [...(lead.updates.conversations || [])].reverse().map((item, index) => {
+                      // Backward compatibility: item can be string (old) or object (new)
+                      const noteId =
+                        typeof item === "object" && item?._id ? String(item._id) : null;
+                      const noteText = typeof item === "string" ? item : item?.text || "";
+                      const noteDate =
+                        typeof item === "object" && item?.createdAt
+                          ? new Date(item.createdAt)
+                          : new Date();
+                      const noteDateTimeStr = formatDateTimeLocal(noteDate);
+
+                      const isActive = activeNoteId && noteId && activeNoteId === noteId;
+                      const draft = noteId ? noteEdits[noteId] : null;
+                      const displayText = draft ? draft.text : noteText;
+                      const displayDateTime = draft ? draft.dateTime : noteDateTimeStr;
+
+                      return (
+                        <div
+                          key={noteId || index}
+                          className={`grid grid-cols-12 gap-6 items-start ${noteId ? "cursor-pointer" : ""}`}
+                        >
+                          <div className="col-span-12 md:col-span-9">
+                            <input
+                              value={displayText}
+                              disabled={loading}
+                              onFocus={() => {
+                                if (!noteId) return;
+                                setActiveNoteId(noteId);
+                                setNoteEdits((prev) => {
+                                  if (prev[noteId]) return prev;
+                                  return {
+                                    ...prev,
+                                    [noteId]: {
+                                      text: noteText,
+                                      dateTime: noteDateTimeStr,
+                                      originalText: noteText,
+                                      originalDateTime: noteDateTimeStr,
+                                    },
+                                  };
+                                });
+                              }}
+                              onChange={(e) => {
+                                if (!noteId) return;
+                                setActiveNoteId(noteId);
+                                const nextText = e.target.value;
+                                setNoteEdits((prev) => {
+                                  const existing = prev[noteId] || {
+                                    text: noteText,
+                                    dateTime: noteDateTimeStr,
+                                    originalText: noteText,
+                                    originalDateTime: noteDateTimeStr,
+                                  };
+                                  return {
+                                    ...prev,
+                                    [noteId]: {
+                                      ...existing,
+                                      text: nextText,
+                                    },
+                                  };
+                                });
+                              }}
+                              className={`w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 shadow-sm ${isActive ? "ring-1 ring-green-200" : ""}`}
+                            />
+                          </div>
+                          <div className="col-span-12 md:col-span-3">
+                            <input
+                              type="datetime-local"
+                              value={displayDateTime}
+                              disabled={loading}
+                              onFocus={() => {
+                                if (!noteId) return;
+                                setActiveNoteId(noteId);
+                                setNoteEdits((prev) => {
+                                  if (prev[noteId]) return prev;
+                                  return {
+                                    ...prev,
+                                    [noteId]: {
+                                      text: noteText,
+                                      dateTime: noteDateTimeStr,
+                                      originalText: noteText,
+                                      originalDateTime: noteDateTimeStr,
+                                    },
+                                  };
+                                });
+                              }}
+                              onChange={(e) => {
+                                if (!noteId) return;
+                                setActiveNoteId(noteId);
+                                const nextDt = e.target.value;
+                                setNoteEdits((prev) => {
+                                  const existing = prev[noteId] || {
+                                    text: noteText,
+                                    dateTime: noteDateTimeStr,
+                                    originalText: noteText,
+                                    originalDateTime: noteDateTimeStr,
+                                  };
+                                  return {
+                                    ...prev,
+                                    [noteId]: {
+                                      ...existing,
+                                      dateTime: nextDt,
+                                    },
+                                  };
+                                });
+                              }}
+                              className={`w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 shadow-sm ${isActive ? "ring-1 ring-green-200" : ""}`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-sm text-gray-500">No previous notes</div>
+                  )}
                 </div>
               </div>
             </>

@@ -257,10 +257,10 @@ export default function Home({ user }) {
             {searchQuery && searchResults.length === 0 && !searchLoading && (
               <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-lg border border-gray-200 p-4 text-center text-gray-500">
                 No results found
-              </div>
+        </div>
             )}
           </div>
-        </div>
+            </div>
 
         {/* --- TODAY SECTION --- */}
         <div className="flex flex-col gap-4">
@@ -271,8 +271,8 @@ export default function Home({ user }) {
             <StatBox label="Fresh Leads" value={leadStats.fresh} />
             <StatBox label="Follow Ups" value={leadStats.interested} />
             <StatBox label="Tasks" value={tasksTodayCount} />
-          </div>
-        </div>
+            </div>
+            </div>
 
         {/* --- TOTAL SECTION --- */}
         <div className="flex flex-col gap-4">
