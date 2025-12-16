@@ -175,6 +175,65 @@ export default function Event({ message, setMessage }) {
     breadth: 0,
     height: 0,
   });
+
+  // Lead/User header info (matches design: Phone no., Email, Lead source, Lead status, Role)
+  const [leadHeader, setLeadHeader] = useState({
+    phone: "",
+    email: "",
+    source: "",
+    status: "",
+    role: "User",
+  });
+
+  const computeLeadStatusForEvent = ({ enquiry, eventObj }) => {
+    if (enquiry?.isLost || eventObj?.status?.lost) return "Lost";
+    // Use eventDate if present (server sets it), otherwise fall back to first event day date
+    const candidateDate =
+      eventObj?.eventDate ||
+      eventObj?.eventDays?.[0]?.date ||
+      eventObj?.date ||
+      null;
+    if (!candidateDate) return "New";
+    const d = new Date(candidateDate);
+    if (Number.isNaN(d.getTime())) return "New";
+    const now = new Date();
+    const diffDays = (d - now) / (1000 * 60 * 60 * 24);
+    const diffWeeks = diffDays / 7;
+    if (diffWeeks <= 8) return "Hot";
+    if (diffWeeks <= 20) return "Warm";
+    return "New";
+  };
+
+  const fetchLeadHeaderByPhone = ({ phone, eventObj }) => {
+    if (!phone) return;
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/enquiry?search=${encodeURIComponent(
+        phone
+      )}&page=1&limit=1`,
+      {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      }
+    )
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const enquiry = data?.list?.[0] || null;
+        const status = computeLeadStatusForEvent({ enquiry, eventObj });
+        setLeadHeader((prev) => ({
+          ...prev,
+          source: enquiry?.source || prev.source || "",
+          status,
+        }));
+      })
+      .catch(() => {
+        // If enquiry fetch fails, keep user details and fall back to status derived from event only
+        const status = computeLeadStatusForEvent({ enquiry: null, eventObj });
+        setLeadHeader((prev) => ({ ...prev, status: prev.status || status }));
+      });
+  };
   const fetchCategoryList = () => {
     setLoading(true);
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/category`, {
@@ -522,6 +581,14 @@ export default function Event({ message, setMessage }) {
       .then((response) => {
         setLoading(false);
         setEvent(response);
+        setLeadHeader({
+          phone: response?.user?.phone || "",
+          email: response?.user?.email || "",
+          source: "",
+          status: computeLeadStatusForEvent({ enquiry: null, eventObj: response }),
+          role: "User",
+        });
+        fetchLeadHeaderByPhone({ phone: response?.user?.phone, eventObj: response });
         setEventPlanner(response?.eventPlanner || " ");
         setManageEventAccess({
           ...manageEventAccess,
@@ -2612,6 +2679,51 @@ export default function Event({ message, setMessage }) {
               Mark as Lost
             </Button>
           </div>
+
+          {/* NEW: Lead/User header fields (matches design) */}
+          <div className="flex flex-row gap-4 w-full">
+            <div className="flex-1">
+              <TextInput
+                placeholder="Phone no."
+                value={leadHeader.phone}
+                readOnly
+                disabled={!leadHeader.phone}
+              />
+            </div>
+            <div className="flex-1">
+              <TextInput
+                placeholder="Email"
+                value={leadHeader.email}
+                readOnly
+                disabled={!leadHeader.email}
+              />
+            </div>
+            <div className="flex-1">
+              <TextInput
+                placeholder="Lead source"
+                value={leadHeader.source}
+                readOnly
+                disabled={!leadHeader.source}
+              />
+            </div>
+            <div className="flex-1">
+              <TextInput
+                placeholder="Lead status"
+                value={leadHeader.status}
+                readOnly
+                disabled={!leadHeader.status}
+              />
+            </div>
+            <div className="flex-1">
+              <TextInput
+                placeholder="Role"
+                value={leadHeader.role}
+                readOnly
+                disabled={!leadHeader.role}
+              />
+            </div>
+          </div>
+
           <p>
             User: {event?.user?.name} [{event?.user?.phone} |{" "}
             {event?.user?.email}]

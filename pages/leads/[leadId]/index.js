@@ -49,6 +49,17 @@ const BASE_INTEREST_OPTIONS = [
   "Cake",
 ];
 
+// Event share (client view link) relationship options
+const RELATIONSHIP_OPTIONS = [
+  "Friend",
+  "Brother",
+  "Sister",
+  "Father",
+  "Mother",
+  "Partner",
+  "Other",
+];
+
 export default function Leads({ message, setMessage }) {
   const router = useRouter();
   const { leadId } = router.query;
@@ -99,6 +110,12 @@ export default function Leads({ message, setMessage }) {
   });
   // Lead status (New / Hot / Warm / Closed / Lost) derived from the existing API response
   const [leadStatus, setLeadStatus] = useState("");
+
+  // Share links (no-login view access via token) - keyed by eventId
+  const [eventSharesByEventId, setEventSharesByEventId] = useState({}); // { [eventId]: Array<EventShare> }
+  const [shareDraftByEventId, setShareDraftByEventId] = useState({}); // { [eventId]: { name, phone, email, relationship } }
+  const [shareLoadingByEventId, setShareLoadingByEventId] = useState({}); // { [eventId]: boolean }
+  const [shareTargetEventId, setShareTargetEventId] = useState("");
   // NEW: Follow ups / Tasks state for this lead.
   // Backed by the existing Task model (category + referenceId) on the server.
   const [followUps, setFollowUps] = useState([]); // category = "Lead-FollowUp", referenceId = leadId
@@ -289,6 +306,150 @@ export default function Leads({ message, setMessage }) {
       })
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
+      });
+  };
+
+  const getShareDraft = (eventId) => {
+    return (
+      shareDraftByEventId?.[eventId] || {
+        name: "",
+        phone: "",
+        email: "",
+        relationship: "",
+      }
+    );
+  };
+
+  const fetchEventShares = (eventId) => {
+    if (!eventId) return;
+    setShareLoadingByEventId((p) => ({ ...p, [eventId]: true }));
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/share`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+      .then((r) => r.json())
+      .then((resp) => {
+        setEventSharesByEventId((p) => ({ ...p, [eventId]: resp?.list || [] }));
+      })
+      .catch(() => {})
+      .finally(() => {
+        setShareLoadingByEventId((p) => ({ ...p, [eventId]: false }));
+      });
+  };
+
+  const createEventShare = (eventId) => {
+    if (!eventId) return;
+    const draft = getShareDraft(eventId);
+    if (!draft.phone) return;
+    setShareLoadingByEventId((p) => ({ ...p, [eventId]: true }));
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/share`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(draft),
+    })
+      .then((r) => r.json())
+      .then((resp) => {
+        if (resp?.message === "success") {
+          // Clear draft
+          setShareDraftByEventId((p) => ({
+            ...p,
+            [eventId]: { name: "", phone: "", email: "", relationship: "" },
+          }));
+          fetchEventShares(eventId);
+          if (resp?.shareLink) {
+            navigator.clipboard?.writeText(resp.shareLink).catch(() => {});
+            setMessage({
+              text: "Share link created & copied!",
+              status: "success",
+              display: true,
+            });
+          } else {
+            setMessage({
+              text: "Share created!",
+              status: "success",
+              display: true,
+            });
+          }
+        } else {
+          setMessage({
+            text: "Failed to create share",
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch(() => {
+        setMessage({
+          text: "Failed to create share",
+          status: "failure",
+          display: true,
+        });
+      })
+      .finally(() => {
+        setShareLoadingByEventId((p) => ({ ...p, [eventId]: false }));
+      });
+  };
+
+  const revokeEventShare = (eventId, shareId) => {
+    if (!eventId || !shareId) return;
+    setShareLoadingByEventId((p) => ({ ...p, [eventId]: true }));
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/share/${shareId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+      .then((r) => r.json())
+      .then((resp) => {
+        if (resp?.message === "success") {
+          fetchEventShares(eventId);
+          setMessage({
+            text: "Share revoked",
+            status: "success",
+            display: true,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setShareLoadingByEventId((p) => ({ ...p, [eventId]: false }));
+      });
+  };
+
+  const copyEventShareLink = (eventId, shareId) => {
+    if (!eventId || !shareId) return;
+    setShareLoadingByEventId((p) => ({ ...p, [eventId]: true }));
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/share/${shareId}/rotate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+      .then((r) => r.json())
+      .then((resp) => {
+        if (resp?.message === "success" && resp?.shareLink) {
+          navigator.clipboard?.writeText(resp.shareLink).catch(() => {});
+          setMessage({
+            text: "Share link copied!",
+            status: "success",
+            display: true,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setShareLoadingByEventId((p) => ({ ...p, [eventId]: false }));
       });
   };
   // Create a new note (top input)
@@ -1087,6 +1248,24 @@ export default function Leads({ message, setMessage }) {
       fetchLeadTasksAndFollowUps();
     }
   }, [leadId]);
+
+  // Prefetch share list for all events when opening the Event Tool tab
+  useEffect(() => {
+    if (display !== "Event Tool") return;
+    if (!lead?.events || lead.events.length === 0) return;
+    // Default share target event to first event (or keep previous if still valid)
+    setShareTargetEventId((prev) => {
+      if (prev && lead.events.some((e) => String(e?._id) === String(prev))) return prev;
+      return lead.events?.[0]?._id || "";
+    });
+    lead.events.forEach((ev) => {
+      const eventId = ev?._id;
+      if (!eventId) return;
+      if (eventSharesByEventId?.[eventId]) return;
+      fetchEventShares(eventId);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [display, lead?.events]);
   useEffect(() => {
     setTransactions([]);
     if (displayPayment) {
@@ -2301,7 +2480,200 @@ export default function Leads({ message, setMessage }) {
               )}
               {lead.events.length > 0 && (
                 <>
+                {/* Lead/User header fields (matches design) */}
+                <div className="flex flex-row gap-4 w-full mb-4">
+                    <div className="flex-1">
+                      <TextInput
+                        placeholder="Phone no."
+                        value={lead.phone || ""}
+                        readOnly
+                        disabled={!lead.phone}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <TextInput
+                        placeholder="Email"
+                        value={lead.email || ""}
+                        readOnly
+                        disabled={!lead.email}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <TextInput
+                        placeholder="Lead source"
+                        value={lead.source || ""}
+                        readOnly
+                        disabled={!lead.source}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <TextInput
+                        placeholder="Lead status"
+                        value={leadStatus || ""}
+                        readOnly
+                        disabled={!leadStatus}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <TextInput
+                        placeholder="Role"
+                        value={lead.userCreated ? "User" : ""}
+                        readOnly
+                        disabled={!lead.userCreated}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Shared with (share-link + metadata, like screenshot) */}
+                  <div className="flex flex-col gap-3 mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="text-sm font-medium text-gray-700">
+                            Shared with
+                          </div>
+                          {lead?.events?.length > 1 && (
+                            <div className="w-64">
+                              <Select
+                                value={shareTargetEventId || ""}
+                                disabled={loading || !shareTargetEventId}
+                                onChange={(e) => setShareTargetEventId(e.target.value)}
+                              >
+                                {(lead.events || []).map((ev) => (
+                                  <option key={ev?._id} value={ev?._id}>
+                                    {ev?.name || "Event"}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                          )}
+                          <div className="flex-1 grid grid-cols-12 gap-4 items-center">
+                            <div className="col-span-12 md:col-span-3">
+                              <TextInput
+                                placeholder="Name"
+                                value={getShareDraft(shareTargetEventId).name}
+                                disabled={loading || !shareTargetEventId || shareLoadingByEventId?.[shareTargetEventId]}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setShareDraftByEventId((p) => ({
+                                    ...p,
+                                    [shareTargetEventId]: { ...getShareDraft(shareTargetEventId), name: v },
+                                  }));
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-3">
+                              <TextInput
+                                placeholder="Phone no."
+                                value={getShareDraft(shareTargetEventId).phone}
+                                disabled={loading || !shareTargetEventId || shareLoadingByEventId?.[shareTargetEventId]}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setShareDraftByEventId((p) => ({
+                                    ...p,
+                                    [shareTargetEventId]: { ...getShareDraft(shareTargetEventId), phone: v },
+                                  }));
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-3">
+                              <TextInput
+                                placeholder="email"
+                                value={getShareDraft(shareTargetEventId).email}
+                                disabled={loading || !shareTargetEventId || shareLoadingByEventId?.[shareTargetEventId]}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setShareDraftByEventId((p) => ({
+                                    ...p,
+                                    [shareTargetEventId]: { ...getShareDraft(shareTargetEventId), email: v },
+                                  }));
+                                }}
+                              />
+                            </div>
+                            <div className="col-span-12 md:col-span-3">
+                              <Select
+                                value={getShareDraft(shareTargetEventId).relationship}
+                                disabled={loading || !shareTargetEventId || shareLoadingByEventId?.[shareTargetEventId]}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setShareDraftByEventId((p) => ({
+                                    ...p,
+                                    [shareTargetEventId]: {
+                                      ...getShareDraft(shareTargetEventId),
+                                      relationship: v,
+                                    },
+                                  }));
+                                }}
+                              >
+                                <option value="">Relationship</option>
+                                {RELATIONSHIP_OPTIONS.map((opt) => (
+                                  <option key={opt} value={opt}>
+                                    {opt}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                          </div>
+                          <Button
+                            color="light"
+                            onClick={() => createEventShare(shareTargetEventId)}
+                            disabled={
+                              loading ||
+                              !shareTargetEventId ||
+                              shareLoadingByEventId?.[shareTargetEventId] ||
+                              !getShareDraft(shareTargetEventId).phone
+                            }
+                          >
+                            Add phone no
+                          </Button>
+                        </div>
+
+                         {(eventSharesByEventId?.[shareTargetEventId] || []).length > 0 && (
+                          <div className="w-full overflow-x-auto">
+                            <Table>
+                              <Table.Head>
+                                <Table.HeadCell>Name</Table.HeadCell>
+                                <Table.HeadCell>Phone</Table.HeadCell>
+                                <Table.HeadCell>Email</Table.HeadCell>
+                                <Table.HeadCell>Relationship</Table.HeadCell>
+                                <Table.HeadCell>Link</Table.HeadCell>
+                                <Table.HeadCell>Action</Table.HeadCell>
+                              </Table.Head>
+                              <Table.Body className="divide-y">
+                                 {(eventSharesByEventId?.[shareTargetEventId] || []).map((s) => (
+                                  <Table.Row key={s._id}>
+                                    <Table.Cell>{s.name || "-"}</Table.Cell>
+                                    <Table.Cell>{s.phone || "-"}</Table.Cell>
+                                    <Table.Cell>{s.email || "-"}</Table.Cell>
+                                    <Table.Cell>{s.relationship || "-"}</Table.Cell>
+                                    <Table.Cell>
+                                      <Button
+                                        color="light"
+                                        size="xs"
+                                         onClick={() => copyEventShareLink(shareTargetEventId, s._id)}
+                                         disabled={loading || shareLoadingByEventId?.[shareTargetEventId]}
+                                      >
+                                        Copy link
+                                      </Button>
+                                    </Table.Cell>
+                                    <Table.Cell>
+                                      <Button
+                                        color="failure"
+                                        size="xs"
+                                         onClick={() => revokeEventShare(shareTargetEventId, s._id)}
+                                         disabled={loading || shareLoadingByEventId?.[shareTargetEventId]}
+                                      >
+                                        Remove
+                                      </Button>
+                                    </Table.Cell>
+                                  </Table.Row>
+                                ))}
+                              </Table.Body>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                  
                   <p>Event Details</p>
+                  
                   {lead.events?.map((item, index) => (
                     <div
                       key={item?._id}
@@ -2435,6 +2807,9 @@ export default function Leads({ message, setMessage }) {
                           ) : null}
                         </div>
                       </div>
+
+                      
+
                       <div className="flex flex-col gap-4 mt-2">
                         <div className="grid grid-cols-6 gap-4">
                           <Label value="Event Day" />
