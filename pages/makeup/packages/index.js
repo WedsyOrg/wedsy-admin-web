@@ -55,14 +55,11 @@ export default function Vendor({ message, setMessage }) {
           </div>
         </div>
         <div className="grid grid-cols-5 gap-4">
-          <Button
-            color="dark"
-            onClick={() => {
-              router.push("/makeup/packages/wedsy-packages");
-            }}
-          >
-            Wedsy Packages
-          </Button>
+          <Link href="/makeup/packages/wedsy-packages">
+            <Button color="dark">
+              Wedsy Packages
+            </Button>
+          </Link>
         </div>
         <div className="flex flex-col gap-2">
           <p className="font-semibold text-lg">Filter by:</p>

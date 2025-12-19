@@ -268,6 +268,35 @@ export default function Event({ user }) {
         console.error("There was a problem with the fetch operation:", error);
       });
   };
+
+  const updateVendorRating = (id, rating) => {
+    const nextRating = parseInt(rating);
+    if (![1, 2, 3, 4, 5].includes(nextRating)) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendor/${id}?updateKey=rating`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ rating: nextRating }),
+    })
+      .then((response) => response.json())
+      .then((response) => {
+        if (response.message === "success") {
+          // optimistic update
+          setList((prev) =>
+            (prev || []).map((v) =>
+              v._id === id ? { ...v, rating: nextRating } : v
+            )
+          );
+        } else {
+          alert("Error, try again");
+        }
+      })
+      .catch((error) => {
+        console.error("There was a problem with the fetch operation:", error);
+      });
+  };
   useEffect(() => {
     fetchList();
   }, [page]);
@@ -638,6 +667,7 @@ export default function Event({ user }) {
                 <Table.HeadCell>Email</Table.HeadCell>
                 <Table.HeadCell>Reg. Date</Table.HeadCell>
                 <Table.HeadCell>City</Table.HeadCell>
+                <Table.HeadCell className="text-center">Rating</Table.HeadCell>
                 <Table.HeadCell>Verified</Table.HeadCell>
                 <Table.HeadCell>Profile Visibility</Table.HeadCell>
               </Table.Head>
@@ -677,6 +707,22 @@ export default function Event({ user }) {
                       {new Date(item.registrationDate).toLocaleDateString()}
                     </Table.Cell>
                     <Table.Cell>{item.businessAddress?.city}</Table.Cell>
+                    <Table.Cell className="text-center">
+                      <Select
+                        value={item.rating || 0}
+                        onChange={(e) => {
+                          updateVendorRating(item._id, e.target.value);
+                        }}
+                        disabled={loading}
+                      >
+                        <option value={0}>-</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
+                      </Select>
+                    </Table.Cell>
                     <Table.Cell className="text-center">
                       <Checkbox
                         checked={item.profileVerified}

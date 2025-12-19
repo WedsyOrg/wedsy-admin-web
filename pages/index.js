@@ -3,8 +3,11 @@ import { BiChevronDown, BiChevronUp, BiDollar } from "react-icons/bi";
 import { BsArrowUp, BsChevronDown, BsChevronUp, BsSearch } from "react-icons/bs";
 import { useEffect, useState } from "react";
 import { Spinner, TextInput } from "flowbite-react";
+import { useRouter } from "next/router";
+import Link from "next/link";
 
 export default function Home({ user }) {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [notificationOpen, setNotificationsOpen] = useState(false);
   const [leadStats, setLeadStats] = useState({
@@ -41,12 +44,38 @@ export default function Home({ user }) {
       })
         .then((response) => response.json())
         .then((response) => {
-          setLeadStats(response.stats);
+          // Ensure stats object exists, otherwise use default values
+          if (response && response.stats) {
+            setLeadStats({
+              total: response.stats.total || 0,
+              lost: response.stats.lost || 0,
+              interested: response.stats.interested || 0,
+              fresh: response.stats.fresh || 0,
+              new: response.stats.new || 0,
+            });
+          } else {
+            // Keep default values if response is invalid
+            setLeadStats({
+              total: 0,
+              lost: 0,
+              interested: 0,
+              fresh: 0,
+              new: 0,
+            });
+          }
           resolve();
         })
         .catch((error) => {
           console.error("There was a problem with the fetch operation:", error);
-          reject();
+          // Keep default values on error
+          setLeadStats({
+            total: 0,
+            lost: 0,
+            interested: 0,
+            fresh: 0,
+            new: 0,
+          });
+          resolve(); // Resolve instead of reject to prevent blocking other fetches
         });
     });
   };
@@ -54,7 +83,7 @@ export default function Home({ user }) {
   const fetchLeadCountsByStatus = () => {
     const fetchCount = (status) => {
       return fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/enquiry?page=1&limit=1000&status=${status}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/enquiry?page=1&limit=1000&status=${encodeURIComponent(status)}`,
         {
           method: "GET",
           headers: {
@@ -63,10 +92,24 @@ export default function Home({ user }) {
           },
         }
       )
-        .then((response) => response.json())
+        .then((response) => {
+          if (!response.ok) {
+            // If response is not ok, return 0 count
+            console.warn(`API returned ${response.status} for status=${status}`);
+            return 0;
+          }
+          return response.json();
+        })
         .then((response) => {
           // Return count based on list length or use totalPages if available
-          return response.list ? response.list.length : 0;
+          if (response && response.list) {
+            return response.list.length;
+          }
+          // If response has totalPages, calculate approximate count
+          if (response && response.totalPages) {
+            return response.totalPages * (response.limit || 1000);
+          }
+          return 0;
         })
         .catch((error) => {
           console.error(`Error fetching ${status} leads:`, error);
@@ -223,32 +266,31 @@ export default function Home({ user }) {
                 ) : (
                   <div className="p-2">
                     {searchResults.map((lead) => (
-                      <div
+                      <Link
                         key={lead._id}
-                        className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
-                        onClick={() => {
-                          // Navigate to individual lead detail page
-                          window.location.href = `/leads/${lead._id}`;
-                        }}
+                        href={`/leads/${lead._id}`}
+                        className="block"
                       >
-                        <p className="font-medium text-gray-900">{lead.name}</p>
-                        {lead.phone && (
-                          <p className="text-sm text-gray-500">{lead.phone}</p>
-                        )}
-                        {lead.email && (
-                          <p className="text-sm text-gray-500">{lead.email}</p>
-                        )}
-                      </div>
+                        <div className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
+                          <p className="font-medium text-gray-900">{lead.name}</p>
+                          {lead.phone && (
+                            <p className="text-sm text-gray-500">{lead.phone}</p>
+                          )}
+                          {lead.email && (
+                            <p className="text-sm text-gray-500">{lead.email}</p>
+                          )}
+                        </div>
+                      </Link>
                     ))}
                     {searchResults.length >= 10 && (
-                      <div
-                        className="p-3 text-center text-sm text-blue-600 hover:bg-gray-50 rounded-lg cursor-pointer"
-                        onClick={() => {
-                          window.location.href = `/leads?search=${encodeURIComponent(searchQuery)}`;
-                        }}
+                      <Link
+                        href={`/leads?search=${encodeURIComponent(searchQuery)}`}
+                        className="block"
                       >
-                        View all results →
-                      </div>
+                        <div className="p-3 text-center text-sm text-blue-600 hover:bg-gray-50 rounded-lg cursor-pointer">
+                          View all results →
+                        </div>
+                      </Link>
                     )}
                   </div>
                 )}
@@ -268,8 +310,8 @@ export default function Home({ user }) {
             Today
           </p>
           <div className="flex flex-row gap-4 flex-wrap">
-            <StatBox label="Fresh Leads" value={leadStats.fresh} />
-            <StatBox label="Follow Ups" value={leadStats.interested} />
+            <StatBox label="Fresh Leads" value={leadStats?.fresh ?? 0} />
+            <StatBox label="Follow Ups" value={leadStats?.interested ?? 0} />
             <StatBox label="Tasks" value={tasksTodayCount} />
             </div>
             </div>
@@ -283,8 +325,8 @@ export default function Home({ user }) {
             <StatBox label="Hot Lead" value={hotLeadsCount} />
             <StatBox label="Potential Lead" value={potentialLeadsCount} />
             <StatBox label="Cold Lead" value={coldLeadsCount} />
-            <StatBox label="Lost leads" value={leadStats.lost} />
-            <StatBox label="Booked" value={leadStats.interested} />
+            <StatBox label="Lost leads" value={leadStats?.lost ?? 0} />
+            <StatBox label="Booked" value={leadStats?.interested ?? 0} />
             <StatBox label="Super hot" value={hotLeadsCount} />
           </div>
         </div>

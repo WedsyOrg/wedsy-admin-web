@@ -1,5 +1,7 @@
 import ImageCard from "@/components/cards/ImageCard";
 import { uploadFile } from "@/utils/file";
+import { resizeImageFile } from "@/utils/imageResize";
+import { loadGoogleMaps } from "@/utils/loadGoogleMaps";
 import { processMobileNumber } from "@/utils/phoneNumber";
 import { toPriceString } from "@/utils/text";
 import {
@@ -28,16 +30,16 @@ import {
 import {
   MdRefresh,
   MdDelete,
-  MdShare,
   MdEdit,
   MdDone,
   MdOutlineImage,
+  MdDownload,
+  MdLink,
   MdKeyboardArrowUp,
   MdKeyboardArrowDown,
   MdContentCopy,
   MdCheckCircleOutline,
 } from "react-icons/md";
-import { RWebShare } from "react-web-share";
 
 export default function Event({ message, setMessage }) {
   const router = useRouter();
@@ -77,6 +79,10 @@ export default function Event({ message, setMessage }) {
     flooringRate: 0,
     decorPrice: 0,
   });
+  const ADD_PRODUCT_DRAFT_KEY =
+    eventId && eventDayId
+      ? `event-tool:add-product-draft:${eventId}:${eventDayId}`
+      : null;
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [editEventInfo, setEditEventInfo] = useState({
@@ -89,6 +95,8 @@ export default function Event({ message, setMessage }) {
     name: "",
     date: "",
     venue: "",
+    eventSpace: "",
+    location: { place_id: "", formatted_address: "", geometry: { lat: 0, lng: 0 } },
     time: "",
     eventDay: "",
   });
@@ -97,8 +105,11 @@ export default function Event({ message, setMessage }) {
     name: "",
     date: "",
     venue: "",
+    eventSpace: "",
+    location: { place_id: "", formatted_address: "", geometry: { lat: 0, lng: 0 } },
     time: "",
   });
+  const eventVenueInputRef = useRef(null);
   const [notes, setNotes] = useState({
     open: false,
     edit: false,
@@ -121,6 +132,10 @@ export default function Event({ message, setMessage }) {
     decor_id: "",
     package_id: "",
     addOns: [],
+  });
+  const [editAddOnNotes, setEditAddOnNotes] = useState({
+    open: false,
+    index: -1,
   });
   const [customItemImageUpload, setCustomItemImageUpload] = useState({
     display: false,
@@ -175,6 +190,9 @@ export default function Event({ message, setMessage }) {
     breadth: 0,
     height: 0,
   });
+
+  // Export UI (Download list)
+  const [downloadWithPrice, setDownloadWithPrice] = useState(true);
 
   // Lead/User header info (matches design: Phone no., Email, Lead source, Lead status, Role)
   const [leadHeader, setLeadHeader] = useState({
@@ -233,6 +251,154 @@ export default function Event({ message, setMessage }) {
         const status = computeLeadStatusForEvent({ enquiry: null, eventObj });
         setLeadHeader((prev) => ({ ...prev, status: prev.status || status }));
       });
+  };
+
+  const buildExportRows = ({ includePrice }) => {
+    const days =
+      eventDayId && eventDay?._id
+        ? [eventDay]
+        : Array.isArray(event?.eventDays)
+        ? event.eventDays
+        : [];
+
+    const rows = [];
+    days.forEach((day) => {
+      const dayLabel = day?.name ? `(${day.name})` : "";
+
+      (day?.decorItems || []).forEach((it) => {
+        rows.push({
+          day: dayLabel,
+          type: "Decor",
+          name: `${it?.decor?.name || ""} ${it?.productVariant || ""}`.trim(),
+          qty: it?.quantity ?? 1,
+          price: includePrice ? (it?.price ?? 0) : undefined,
+        });
+      });
+
+      (day?.packages || []).forEach((pkg) => {
+        rows.push({
+          day: dayLabel,
+          type: "Package",
+          name: pkg?.package?.name || "",
+          qty: 1,
+          price: includePrice ? (pkg?.price ?? 0) : undefined,
+        });
+      });
+
+      (day?.customItems || []).forEach((ci) => {
+        rows.push({
+          day: dayLabel,
+          type: day?.customItemsTitle || "Add-Ons",
+          name: ci?.name || "",
+          qty: ci?.quantity ?? 1,
+          price: includePrice ? (ci?.price ?? 0) : undefined,
+        });
+      });
+
+      (day?.mandatoryItems || []).forEach((mi) => {
+        rows.push({
+          day: dayLabel,
+          type: "Mandatory",
+          name: mi?.description || mi?.title || "",
+          qty: mi?.itemRequired ? 1 : 0,
+          price: includePrice ? (mi?.price ?? 0) : undefined,
+        });
+      });
+    });
+
+    return rows;
+  };
+
+  const downloadBlob = ({ blob, filename }) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadExcel = () => {
+    const includePrice = downloadWithPrice;
+    const rows = buildExportRows({ includePrice });
+    const headers = includePrice
+      ? ["Event Day", "Type", "Item", "Qty", "Price"]
+      : ["Event Day", "Type", "Item", "Qty"];
+    const csvEscape = (v) => {
+      const s = String(v ?? "");
+      if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+    const lines = [
+      headers.join(","),
+      ...rows.map((r) => {
+        const base = [r.day, r.type, r.name, r.qty];
+        if (includePrice) base.push(r.price);
+        return base.map(csvEscape).join(",");
+      }),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const suffix = includePrice ? "with-price" : "without-price";
+    downloadBlob({
+      blob,
+      filename: `event-${eventId || "export"}-${suffix}.csv`,
+    });
+  };
+
+  const handleDownloadPdf = () => {
+    const includePrice = downloadWithPrice;
+    const rows = buildExportRows({ includePrice });
+    const title = `Event ${event?.name || eventId || ""} - ${
+      includePrice ? "With price" : "Without price"
+    }`;
+
+    const tableHead = includePrice
+      ? `<tr><th>Event Day</th><th>Type</th><th>Item</th><th>Qty</th><th>Price</th></tr>`
+      : `<tr><th>Event Day</th><th>Type</th><th>Item</th><th>Qty</th></tr>`;
+
+    const tableRows = rows
+      .map((r) => {
+        const cells = includePrice
+          ? `<td>${r.day}</td><td>${r.type}</td><td>${r.name}</td><td>${r.qty}</td><td>${r.price ?? ""}</td>`
+          : `<td>${r.day}</td><td>${r.type}</td><td>${r.name}</td><td>${r.qty}</td>`;
+        return `<tr>${cells}</tr>`;
+      })
+      .join("");
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 24px; }
+      h1 { font-size: 16px; margin: 0 0 12px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+      th { background: #f3f4f6; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <table>
+      <thead>${tableHead}</thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+    <script>
+      window.onload = function () { window.print(); };
+    </script>
+  </body>
+</html>`;
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
   };
   const fetchCategoryList = () => {
     setLoading(true);
@@ -335,8 +501,12 @@ export default function Event({ message, setMessage }) {
   const UpdateDecorSetupLocationImage = async () => {
     setLoading(true);
     if (editDecorSetupLocationImage.decor_id) {
+      const resized = await resizeImageFile(
+        editDecorSetupLocationImage.setupLocationImageFile,
+        { maxWidth: 1600, maxHeight: 1600, quality: 0.82 }
+      );
       let tempImage = await uploadFile({
-        file: editDecorSetupLocationImage.setupLocationImageFile,
+        file: resized,
         path: "event-tool/setup-location-image",
         id: `${new Date().getTime()}-${eventId}-${
           editDecorSetupLocationImage.decor_id
@@ -860,6 +1030,8 @@ export default function Event({ message, setMessage }) {
             date: editEventDayInfo.date,
             time: editEventDayInfo.time,
             venue: editEventDayInfo.venue,
+            eventSpace: editEventDayInfo.eventSpace,
+            location: editEventDayInfo.location,
           }),
         }
       )
@@ -878,6 +1050,8 @@ export default function Event({ message, setMessage }) {
               name: "",
               date: "",
               venue: "",
+              eventSpace: "",
+              location: { place_id: "", formatted_address: "", geometry: { lat: 0, lng: 0 } },
               time: "",
               eventDay: "",
             });
@@ -931,6 +1105,8 @@ export default function Event({ message, setMessage }) {
         date: addEventDay.date,
         time: addEventDay.time,
         venue: addEventDay.venue,
+        eventSpace: addEventDay.eventSpace,
+        location: addEventDay.location,
       }),
     })
       .then((response) => response.json())
@@ -948,6 +1124,8 @@ export default function Event({ message, setMessage }) {
             name: "",
             date: "",
             venue: "",
+            eventSpace: "",
+            location: { place_id: "", formatted_address: "", geometry: { lat: 0, lng: 0 } },
             time: "",
           });
         }
@@ -1213,6 +1391,8 @@ export default function Event({ message, setMessage }) {
   };
   const AddDecorItemToEvent = ({}) => {
     setLoading(true);
+    const pathwayMultiplier =
+      addDecorItem?.decorItem?.category === "Pathway" ? addDecorItem.quantity : 1;
     fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/decor/${eventDayId}`,
       {
@@ -1239,13 +1419,15 @@ export default function Event({ message, setMessage }) {
             (addDecorItem.platform
               ? addDecorItem.dimensions.length *
                 addDecorItem.dimensions.breadth *
-                platformPrice.price
+                platformPrice.price *
+                pathwayMultiplier
               : 0) +
             (addDecorItem.dimensions.length + addDecorItem.dimensions.height) *
               (addDecorItem.dimensions.breadth +
                 addDecorItem.dimensions.height) *
               (flooringPrice.find((i) => i.title === addDecorItem.flooring)
-                ?.price || 0),
+                ?.price || 0) *
+              pathwayMultiplier,
           category: addDecorItem.decorItem?.category || "",
           variant: addDecorItem.variant,
           quantity: addDecorItem.quantity,
@@ -1272,6 +1454,11 @@ export default function Event({ message, setMessage }) {
       .then((response) => {
         if (response.message === "success") {
           setLoading(false);
+          try {
+            if (ADD_PRODUCT_DRAFT_KEY) {
+              sessionStorage.removeItem(ADD_PRODUCT_DRAFT_KEY);
+            }
+          } catch (e) {}
           fetchEvent();
           setAddDecorItem({
             ...addDecorItem,
@@ -1321,6 +1508,7 @@ export default function Event({ message, setMessage }) {
     priceModifier,
   }) => {
     setLoading(true);
+    const pathwayMultiplier = category === "Pathway" ? quantity : 1;
     fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/decor/${eventDayId}`,
       {
@@ -1345,10 +1533,17 @@ export default function Event({ message, setMessage }) {
             quantity * (decorPrice + priceModifier) +
             (platform
               ? dimensions.length * dimensions.breadth * platformPrice.price
-              : 0) +
+              : 0) *
+              pathwayMultiplier +
             (dimensions.length + dimensions.height) *
               (dimensions.breadth + dimensions.height) *
               (flooringPrice.find((i) => i.title === flooring)?.price || 0) +
+            (category === "Pathway"
+              ? (dimensions.length + dimensions.height) *
+                (dimensions.breadth + dimensions.height) *
+                (flooringPrice.find((i) => i.title === flooring)?.price || 0) *
+                (pathwayMultiplier - 1)
+              : 0) +
             addOns?.reduce((accumulator, currentValue) => {
               return accumulator + currentValue.price;
             }, 0),
@@ -1508,8 +1703,13 @@ export default function Event({ message, setMessage }) {
     Promise.all(
       notes?.notes?.map(async (i, index) => {
         if (i.imageFile) {
+          const resized = await resizeImageFile(i.imageFile, {
+            maxWidth: 1600,
+            maxHeight: 1600,
+            quality: 0.82,
+          });
           let tempImage = await uploadFile({
-            file: i.imageFile,
+            file: resized,
             path: "event-tool/notes",
             id: `${new Date().getTime()}-${eventId}-${notes.decor_id}-${index}`,
           });
@@ -1858,6 +2058,146 @@ export default function Event({ message, setMessage }) {
       fetchDecorList();
     }
   }, [addDecorItem.productId]);
+
+  // Autosave: Add Product modal draft (session-only, minimal payload)
+  useEffect(() => {
+    if (!ADD_PRODUCT_DRAFT_KEY) return;
+    if (!addDecorItem?.display) return;
+
+    const t = setTimeout(() => {
+      try {
+        // Store ONLY minimal, serializable fields (no decorList/decorItem images)
+        const draft = {
+          v: 1,
+          savedAt: Date.now(),
+          productId: addDecorItem.productId || "",
+          decor: addDecorItem.decor || "",
+          variant: addDecorItem.variant || "",
+          productVariant: addDecorItem.productVariant || "",
+          quantity: addDecorItem.quantity || 1,
+          unit: addDecorItem.unit || "",
+          platform: !!addDecorItem.platform,
+          flooring: addDecorItem.flooring || "",
+          dimensions: addDecorItem.dimensions || {
+            length: 0,
+            breadth: 0,
+            height: 0,
+          },
+        };
+
+        const json = JSON.stringify(draft);
+        // safety cap: do not store very large payloads
+        if (json.length > 25_000) return;
+        sessionStorage.setItem(ADD_PRODUCT_DRAFT_KEY, json);
+      } catch (e) {}
+    }, 400); // debounce typing
+
+    return () => clearTimeout(t);
+  }, [
+    ADD_PRODUCT_DRAFT_KEY,
+    addDecorItem?.display,
+    addDecorItem?.productId,
+    addDecorItem?.decor,
+    addDecorItem?.variant,
+    addDecorItem?.productVariant,
+    addDecorItem?.quantity,
+    addDecorItem?.unit,
+    addDecorItem?.platform,
+    addDecorItem?.flooring,
+    addDecorItem?.dimensions?.length,
+    addDecorItem?.dimensions?.breadth,
+    addDecorItem?.dimensions?.height,
+  ]);
+
+  // Restore draft when opening Add Product modal (only for current event+eventDay)
+  useEffect(() => {
+    if (!ADD_PRODUCT_DRAFT_KEY) return;
+    if (!addDecorItem?.display) return;
+    // only restore if current modal is empty
+    if (addDecorItem?.productId || addDecorItem?.decor) return;
+
+    try {
+      const raw = sessionStorage.getItem(ADD_PRODUCT_DRAFT_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      // Ignore very old drafts (24h)
+      if (draft?.savedAt && Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+        sessionStorage.removeItem(ADD_PRODUCT_DRAFT_KEY);
+        return;
+      }
+
+      setAddDecorItem((prev) => ({
+        ...prev,
+        productId: draft?.productId || "",
+        decor: draft?.decor || "",
+        variant: draft?.variant || "",
+        productVariant: draft?.productVariant || "",
+        quantity: draft?.quantity || 1,
+        unit: draft?.unit || "",
+        platform: !!draft?.platform,
+        flooring: draft?.flooring || "",
+        dimensions: draft?.dimensions || { length: 0, breadth: 0, height: 0 },
+        // Reset derived/heavy fields (will be refetched/recomputed)
+        decorItem: {},
+        decorList: [],
+        platformRate: 0,
+        flooringRate: 0,
+        decorPrice: 0,
+      }));
+    } catch (e) {}
+  }, [ADD_PRODUCT_DRAFT_KEY, addDecorItem?.display]);
+
+  // Google Places Autocomplete for Event Day Venue (edit/add)
+  useEffect(() => {
+    const shouldInit = editEventDayInfo.edit || addEventDay.add;
+    if (!shouldInit) return;
+
+    const init = async () => {
+      try {
+        const google = await loadGoogleMaps();
+        if (!google?.maps?.places || !eventVenueInputRef.current) return;
+
+        const autocomplete = new google.maps.places.Autocomplete(
+          eventVenueInputRef.current,
+          { types: ["geocode"] }
+        );
+
+        autocomplete.addListener("place_changed", () => {
+          const place = autocomplete.getPlace();
+          if (!place?.geometry) return;
+
+          const loc = {
+            place_id: place.place_id || "",
+            formatted_address: place.formatted_address || "",
+            geometry: {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            },
+          };
+
+          if (editEventDayInfo.edit) {
+            setEditEventDayInfo((prev) => ({
+              ...prev,
+              venue: loc.formatted_address || prev.venue,
+              location: loc,
+            }));
+          } else if (addEventDay.add) {
+            setAddEventDay((prev) => ({
+              ...prev,
+              venue: loc.formatted_address || prev.venue,
+              location: loc,
+            }));
+          }
+        });
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    // slight delay so input is in DOM
+    const t = setTimeout(init, 50);
+    return () => clearTimeout(t);
+  }, [editEventDayInfo.edit, addEventDay.add]);
 
   return (
     <>
@@ -2272,17 +2612,38 @@ export default function Event({ message, setMessage }) {
                   className="col-span-2"
                 />
                 {i.image ? (
-                  <Image
-                    src={i.image}
-                    alt="Decor"
-                    sizes="100%"
-                    width={0}
-                    height={0}
-                    className="w-full h-auto cursor-pointer"
-                    onClick={() => {
-                      setEnlargedImage(i.image);
-                    }}
-                  />
+                  <div className="relative">
+                    <Image
+                      src={i.image}
+                      alt="Note"
+                      sizes="100%"
+                      width={0}
+                      height={0}
+                      className="w-full h-auto cursor-pointer"
+                      onClick={() => {
+                        setEnlargedImage(i.image);
+                      }}
+                    />
+                    {/* Delete image only (do not delete whole note row) */}
+                    {notes?.edit && (
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 bg-white/90 border border-gray-200 rounded-md p-1 hover:bg-white"
+                        onClick={() => {
+                          setNotes({
+                            ...notes,
+                            notes: notes?.notes?.map((rec, recIndex) =>
+                              recIndex === index
+                                ? { ...rec, image: "", imageFile: null }
+                                : rec
+                            ),
+                          });
+                        }}
+                      >
+                        <MdDelete />
+                      </button>
+                    )}
+                  </div>
                 ) : (
                   <div />
                 )}
@@ -2397,9 +2758,9 @@ export default function Event({ message, setMessage }) {
           <div className="flex flex-col gap-6">
             <Table hoverable className="width-full overflow-x-auto">
               <Table.Head>
-                <Table.HeadCell className="w-1/3">Item Name</Table.HeadCell>
-                <Table.HeadCell className="w-1/3">Price</Table.HeadCell>
-                <Table.HeadCell className="w-1/3">Notes</Table.HeadCell>
+                <Table.HeadCell className="w-[60%]">Item Name</Table.HeadCell>
+                <Table.HeadCell className="w-[25%]">Price</Table.HeadCell>
+                <Table.HeadCell className="w-[15%]">Notes</Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
                 {editAddOns?.addOns?.map((item, index) => (
@@ -2407,11 +2768,12 @@ export default function Event({ message, setMessage }) {
                     className="bg-white dark:border-gray-700 dark:bg-gray-800"
                     key={item._id}
                   >
-                    <Table.Cell>
+                    <Table.Cell className="min-w-[420px]">
                       <TextInput
                         placeholder="Item Name"
                         value={item.name}
                         disabled={loading || event?.status?.approved}
+                        className="w-full"
                         onChange={(e) => {
                           setEditAddOns({
                             ...editAddOns,
@@ -2426,12 +2788,13 @@ export default function Event({ message, setMessage }) {
                         }}
                       />
                     </Table.Cell>
-                    <Table.Cell className="flex flex-row gap-2 items-center">
+                    <Table.Cell className="flex flex-row gap-2 items-center min-w-[220px]">
                       <TextInput
                         placeholder="Price"
                         type="number"
                         value={item.price}
                         disabled={loading || event?.status?.approved}
+                        className="w-[120px]"
                         onChange={(e) => {
                           setEditAddOns({
                             ...editAddOns,
@@ -2450,6 +2813,7 @@ export default function Event({ message, setMessage }) {
                       />
                       <Button
                         color="gray"
+                        className="px-2"
                         onClick={() => {
                           setEditAddOns({
                             ...editAddOns,
@@ -2485,24 +2849,14 @@ export default function Event({ message, setMessage }) {
                       )}
                     </Table.Cell>
                     <Table.Cell>
-                      <Textarea
-                        rows={1}
-                        placeholder="Notes"
-                        value={item.notes}
-                        disabled={loading || event?.status?.approved}
-                        onChange={(e) => {
-                          setEditAddOns({
-                            ...editAddOns,
-                            addOns: editAddOns?.addOns?.map((rec, recIndex) => {
-                              if (recIndex === index) {
-                                return { ...rec, notes: e.target.value };
-                              } else {
-                                return rec;
-                              }
-                            }),
-                          });
-                        }}
-                      />
+                      <Button
+                        color="light"
+                        className="w-full justify-center"
+                        disabled={loading}
+                        onClick={() => setEditAddOnNotes({ open: true, index })}
+                      >
+                        Notes
+                      </Button>
                     </Table.Cell>
                   </Table.Row>
                 ))}
@@ -2534,6 +2888,53 @@ export default function Event({ message, setMessage }) {
                 }}
               >
                 <BsPlus /> Add New
+              </Button>
+            </div>
+          </div>
+        </Modal.Body>
+      </Modal>
+
+      {/* Add-on Notes Modal */}
+      <Modal
+        show={editAddOnNotes.open}
+        size="lg"
+        popup
+        onClose={() => setEditAddOnNotes({ open: false, index: -1 })}
+      >
+        <Modal.Header>
+          <h3 className="text-xl font-medium text-gray-900 dark:text-white px-4">
+            Add-on Notes
+          </h3>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="flex flex-col gap-4">
+            <Textarea
+              rows={6}
+              placeholder="Write notes for this add-on..."
+              value={
+                editAddOnNotes.index >= 0
+                  ? editAddOns?.addOns?.[editAddOnNotes.index]?.notes || ""
+                  : ""
+              }
+              disabled={loading || event?.status?.approved}
+              onChange={(e) => {
+                if (editAddOnNotes.index < 0) return;
+                setEditAddOns({
+                  ...editAddOns,
+                  addOns: editAddOns?.addOns?.map((rec, recIndex) =>
+                    recIndex === editAddOnNotes.index
+                      ? { ...rec, notes: e.target.value }
+                      : rec
+                  ),
+                });
+              }}
+            />
+            <div className="flex gap-3 justify-end">
+              <Button
+                color="gray"
+                onClick={() => setEditAddOnNotes({ open: false, index: -1 })}
+              >
+                Done
               </Button>
             </div>
           </div>
@@ -2602,42 +3003,34 @@ export default function Event({ message, setMessage }) {
         <div className="bg-white shadow-xl rounded-3xl p-8 w-full flex flex-col gap-4 ">
           <div className="flex flex-row items-center gap-4">
             <p className="text-xl font-medium">{event.name}</p>
-            {copied ? (
-              <MdCheckCircleOutline
-                className="ml-1"
-                cursor={"pointer"}
-                size={24}
-              />
-            ) : (
-              <MdContentCopy
-                onClick={() => {
-                  navigator.clipboard
-                    .writeText(`https://wedsy.in/event/${event?._id}/view`)
-                    .then(
-                      () => {
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
-                      },
-                      (err) => {
-                        console.error("Failed to copy text: ", err);
-                      }
-                    );
-                }}
-                className="ml-1"
-                cursor={"pointer"}
-                size={24}
-              />
-            )}
-            <RWebShare
-              data={{
-                title: `EventPlanner - ${event.name}`,
-                text: `Check out the Wedsy's event plan for ${event.name}.`,
-                url: `https://wedsy.in/event/${event?._id}/view`,
+            <Button
+              color="light"
+              className="whitespace-nowrap"
+              disabled={loading}
+              onClick={() => {
+                navigator.clipboard
+                  .writeText(`https://wedsy.in/event/${event?._id}/view`)
+                  .then(
+                    () => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    },
+                    (err) => {
+                      console.error("Failed to copy text: ", err);
+                    }
+                  );
               }}
-              onClick={() => console.log("shared successfully!")}
             >
-              <MdShare className="ml-1" cursor={"pointer"} />
-            </RWebShare>
+              {copied ? (
+                <>
+                  Copied <MdCheckCircleOutline className="ml-1" size={18} />
+                </>
+              ) : (
+                <>
+                  Copy Link <MdContentCopy className="ml-1" size={18} />
+                </>
+              )}
+            </Button>
             <MdRefresh
               // className="mr-auto"
               onClick={() => {
@@ -2863,14 +3256,15 @@ export default function Event({ message, setMessage }) {
             </div>
             <p className="font-medium text-lg">Event Days:</p>
             <div className="flex flex-col gap-4 mt-2">
-              <div className="grid grid-cols-6 gap-4">
+              <div className="grid grid-cols-7 gap-4">
                 <Label value="Event Day" />
                 <Label value="Date" />
                 <Label value="Time" />
-                <Label value="Venue" />
+                <Label value="Location (Google)" />
+                <Label value="Event Space" />
               </div>
               {event?.eventDays?.map((rec, index) => (
-                <div className="grid grid-cols-6 gap-4" key={rec._id}>
+                <div className="grid grid-cols-7 gap-4" key={rec._id}>
                   <TextInput
                     placeholder="Event Name"
                     value={
@@ -2940,7 +3334,7 @@ export default function Event({ message, setMessage }) {
                     }}
                   />
                   <TextInput
-                    placeholder="Event Venue"
+                    placeholder="Location (Google)"
                     value={
                       editEventDayInfo.edit &&
                       editEventDayInfo.eventDay === rec._id
@@ -2954,10 +3348,42 @@ export default function Event({ message, setMessage }) {
                       )
                     }
                     disabled={loading}
+                    ref={
+                      editEventDayInfo.edit && editEventDayInfo.eventDay === rec._id
+                        ? eventVenueInputRef
+                        : undefined
+                    }
                     onChange={(e) => {
                       setEditEventDayInfo({
                         ...editEventDayInfo,
                         venue: e.target.value,
+                        location: {
+                          place_id: "",
+                          formatted_address: e.target.value,
+                          geometry: { lat: 0, lng: 0 },
+                        },
+                      });
+                    }}
+                  />
+                  <TextInput
+                    placeholder="Event Space (e.g., Imperia Hall)"
+                    value={
+                      editEventDayInfo.edit &&
+                      editEventDayInfo.eventDay === rec._id
+                        ? editEventDayInfo.eventSpace
+                        : rec?.eventSpace || ""
+                    }
+                    readOnly={
+                      !(
+                        editEventDayInfo.edit &&
+                        editEventDayInfo.eventDay === rec._id
+                      )
+                    }
+                    disabled={loading}
+                    onChange={(e) => {
+                      setEditEventDayInfo({
+                        ...editEventDayInfo,
+                        eventSpace: e.target.value,
                       });
                     }}
                   />
@@ -2972,6 +3398,13 @@ export default function Event({ message, setMessage }) {
                             name: rec.name,
                             date: rec.date,
                             venue: rec.venue,
+                            eventSpace: rec?.eventSpace || "",
+                            location:
+                              rec?.location || {
+                                place_id: "",
+                                formatted_address: rec.venue || "",
+                                geometry: { lat: 0, lng: 0 },
+                              },
                             time: rec.time,
                             eventDay: rec._id,
                           });
@@ -3086,7 +3519,7 @@ export default function Event({ message, setMessage }) {
                   </div>
                 </div>
               ))}
-              <div className="grid grid-cols-6 gap-4">
+              <div className="grid grid-cols-7 gap-4">
                 {addEventDay.add ? (
                   <>
                     <TextInput
@@ -3125,13 +3558,30 @@ export default function Event({ message, setMessage }) {
                       }}
                     />
                     <TextInput
-                      placeholder="Event Venue"
+                      placeholder="Location (Google)"
                       value={addEventDay.venue}
                       disabled={loading}
+                      ref={eventVenueInputRef}
                       onChange={(e) => {
                         setAddEventDay({
                           ...addEventDay,
                           venue: e.target.value,
+                          location: {
+                            place_id: "",
+                            formatted_address: e.target.value,
+                            geometry: { lat: 0, lng: 0 },
+                          },
+                        });
+                      }}
+                    />
+                    <TextInput
+                      placeholder="Event Space (e.g., Imperia Hall)"
+                      value={addEventDay.eventSpace}
+                      disabled={loading}
+                      onChange={(e) => {
+                        setAddEventDay({
+                          ...addEventDay,
+                          eventSpace: e.target.value,
                         });
                       }}
                     />
@@ -3160,6 +3610,12 @@ export default function Event({ message, setMessage }) {
                             name: "",
                             date: "",
                             venue: "",
+                            eventSpace: "",
+                            location: {
+                              place_id: "",
+                              formatted_address: "",
+                              geometry: { lat: 0, lng: 0 },
+                            },
                             time: "",
                           });
                         }}
@@ -3179,6 +3635,12 @@ export default function Event({ message, setMessage }) {
                         date: "",
                         time: "",
                         venue: "",
+                        eventSpace: "",
+                        location: {
+                          place_id: "",
+                          formatted_address: "",
+                          geometry: { lat: 0, lng: 0 },
+                        },
                       });
                     }}
                     disabled={loading || event?.status?.approved}
@@ -3190,64 +3652,82 @@ export default function Event({ message, setMessage }) {
             </div>
           </div>
           <div className="border-b-2 border-b-black pb-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <p className="text-xl font-medium col-span-2">Tasks</p>
-                <TextInput
-                  readOnly={true}
-                  value={tasks[tasks.length - 1]?.task}
-                />
-                <TextInput
-                  type="datetime-local"
-                  readOnly={true}
-                  value={
-                    tasks.length > 0
-                      ? new Date(tasks[tasks.length - 1]?.deadline)
-                          .toLocaleString("sv-SE", {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit",
+            {/* Tasks + Notes (Admin) header row — match provided design */}
+            <div className="grid grid-cols-3 gap-8 items-start">
+              {/* Tasks (left) */}
+              <div className="col-span-1 flex flex-col gap-4">
+                <p className="text-xl font-medium">Tasks</p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    color="light"
+                    className="justify-start"
+                    disabled={loading}
+                    onClick={() => setDisplayTasksHistory(true)}
+                  >
+                    Previous Tasks
+                  </Button>
+                  <TextInput
+                    readOnly={true}
+                    value={
+                      tasks.length > 0
+                        ? `${new Date(tasks[tasks.length - 1]?.deadline).toLocaleDateString(
+                            "en-GB"
+                          )}  ${new Date(
+                            tasks[tasks.length - 1]?.deadline
+                          ).toLocaleTimeString("en-GB", {
                             hour: "2-digit",
                             minute: "2-digit",
-                          })
-                          .replace(" ", "T")
-                      : ""
-                  }
-                />
-                <Button
-                  color="dark"
-                  disabled={loading}
-                  onClick={() => {
-                    setAddNewTask({
-                      ...addNewTask,
-                      task: "",
-                      deadline: "",
-                      display: true,
-                    });
-                  }}
-                >
-                  <BsPlus size={16} /> Create Task
-                </Button>
-                <Button
-                  color="light"
-                  onClick={() => setDisplayTasksHistory(true)}
-                >
-                  View History
-                </Button>
+                          })}`
+                        : ""
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    className="!bg-[#676767] text-white hover:!bg-[#676767]/80 focus:!ring-0 focus:!ring-offset-0"
+                    disabled={loading}
+                    onClick={() => {
+                      setAddNewTask({
+                        ...addNewTask,
+                        task: "",
+                        deadline: "",
+                        display: true,
+                      });
+                    }}
+                  >
+                    <BsPlus size={16} /> Create Task
+                  </Button>
+                  <Button
+                    color="light"
+                    outline
+                    className="justify-between"
+                    onClick={() => setDisplayTasksHistory(true)}
+                    disabled={loading}
+                  >
+                    <span>View History</span>
+                    <BsChevronDown size={16} />
+                  </Button>
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-4">
-                <p className="text-xl font-medium">Notes(Admin)</p>
-                <div className="flex gap-2">
-                  <Textarea
-                    rows={4}
+
+              {/* Notes (Admin) (right) */}
+              <div className="col-span-2 flex flex-col gap-4">
+                <p className="text-xl font-medium">Notes (Admin)</p>
+                <div className="flex gap-4 items-center">
+                  <TextInput
+                    placeholder="Add notes here"
                     value={eventNotes}
                     onChange={(e) => {
                       setEventNotes(e.target.value);
                     }}
                     disabled={loading}
+                    className="flex-1"
                   />
+                  {/* Keep Update Notes button (required) */}
                   <Button
-                    color="dark"
+                    className="!bg-[#676767] text-white hover:!bg-[#676767]/80 focus:!ring-0 focus:!ring-offset-0"
                     disabled={loading}
                     onClick={() => {
                       updateEventNotes();
@@ -3284,50 +3764,47 @@ export default function Event({ message, setMessage }) {
             </div>
           </div>
           <div className="border-b-2 border-b-black pb-4">
-            <div className="grid grid-cols-6 gap-4">
-              <p className="text-xl font-medium col-span-3">Event Tool</p>
-              {eventToolView !== "ops" && (
-                <Button
-                  color="dark"
-                  disabled={loading}
-                  onClick={() => {
-                    setEventToolView("ops");
-                  }}
-                >
-                  Ops View
-                </Button>
-              )}
-              {eventToolView !== "admin" && (
-                <Button
-                  color="dark"
-                  disabled={loading}
-                  onClick={() => {
-                    setEventToolView("admin");
-                  }}
-                >
-                  Admin View
-                </Button>
-              )}
-              <Button
-                color="success"
-                disabled={loading}
-                onClick={() => {
-                  SendEventBookingReminder();
-                }}
-              >
-                Booking Reminder
-              </Button>
+            <div className="flex flex-row items-start gap-6 flex-wrap">
+              <p className="text-xl font-medium mr-auto">Event Tool</p>
+
+              {/* View toggles */}
+              <div className="flex flex-row gap-3 flex-wrap">
+                {eventToolView !== "ops" && (
+                  <Button
+                    color="dark"
+                    disabled={loading}
+                    onClick={() => {
+                      setEventToolView("ops");
+                    }}
+                  >
+                    Ops View
+                  </Button>
+                )}
+                {eventToolView !== "admin" && (
+                  <Button
+                    color="dark"
+                    disabled={loading}
+                    onClick={() => {
+                      setEventToolView("admin");
+                    }}
+                  >
+                    Admin View
+                  </Button>
+                )}
+              </div>
+
+              {/* Event day selector */}
               <Select
                 value={eventDayId}
                 onChange={(e) => {
                   setEventDayId(e.target.value);
                   setEventDayNotes(
-                    event?.eventDays?.find(
-                      (item) => item?._id === e.target.value
-                    )?.notes || ""
+                    event?.eventDays?.find((item) => item?._id === e.target.value)
+                      ?.notes || ""
                   );
                 }}
                 disabled={loading}
+                className="min-w-[220px]"
               >
                 <option value={""}>Select Event Day</option>
                 {event?.eventDays?.map((item) => (
@@ -3336,6 +3813,75 @@ export default function Event({ message, setMessage }) {
                   </option>
                 ))}
               </Select>
+
+              {/* Download list widget (right side) */}
+              <div className="ml-auto flex flex-col gap-3 items-end">
+                <div className="flex gap-3">
+                  <Button
+                    color="light"
+                    className={`!bg-[#B5B5B5] !text-black hover:!bg-[#B5B5B5]/80 focus:!ring-0 ${
+                      downloadWithPrice ? "!opacity-100" : "!opacity-80"
+                    }`}
+                    onClick={() => setDownloadWithPrice(true)}
+                    disabled={loading}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white">
+                        <MdLink size={14} />
+                      </span>
+                      With price
+                    </span>
+                  </Button>
+                  <Button
+                    color="light"
+                    className={`!bg-[#B5B5B5] !text-black hover:!bg-[#B5B5B5]/80 focus:!ring-0 ${
+                      !downloadWithPrice ? "!opacity-100" : "!opacity-80"
+                    }`}
+                    onClick={() => setDownloadWithPrice(false)}
+                    disabled={loading}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white">
+                        <MdLink size={14} />
+                      </span>
+                      Without price
+                    </span>
+                  </Button>
+                </div>
+
+                <div className="flex gap-3 items-center">
+                  <Button
+                    color="light"
+                    className="!bg-[#B3B3B3] !text-black hover:!bg-[#B3B3B3]/80 focus:!ring-0"
+                    onClick={handleDownloadPdf}
+                    disabled={loading}
+                  >
+                    <span className="flex items-center gap-2">
+                      Download Pdf <MdDownload size={18} />
+                    </span>
+                  </Button>
+                  <Button
+                    color="light"
+                    className="!bg-[#B3B3B3] !text-black hover:!bg-[#B3B3B3]/80 focus:!ring-0"
+                    onClick={handleDownloadExcel}
+                    disabled={loading}
+                  >
+                    <span className="flex items-center gap-2">
+                      Download Excel <MdDownload size={18} />
+                    </span>
+                  </Button>
+                  <Button
+                    color="success"
+                    className="min-w-[260px]"
+                    disabled={loading}
+                    onClick={() => {
+                      SendEventBookingReminder();
+                    }}
+                  >
+                    Booking reminder
+                  </Button>
+                </div>
+              </div>
             </div>
             {eventDay._id && (
               <div className="flex flex-col pt-4 gap-4">
@@ -3378,6 +3924,11 @@ export default function Event({ message, setMessage }) {
                   show={addDecorItem.display}
                   size="xl"
                   onClose={() => {
+                    try {
+                      if (ADD_PRODUCT_DRAFT_KEY) {
+                        sessionStorage.removeItem(ADD_PRODUCT_DRAFT_KEY);
+                      }
+                    } catch (e) {}
                     setAddDecorItem({
                       ...addDecorItem,
                       display: false,
@@ -3388,6 +3939,7 @@ export default function Event({ message, setMessage }) {
                       flooring: "",
                       category: "",
                       variant: "",
+                      productVariant: "",
                       quantity: 1,
                       unit: "",
                       productId: "",
@@ -3658,7 +4210,10 @@ export default function Event({ message, setMessage }) {
                             (addDecorItem.platform
                               ? addDecorItem.dimensions.length *
                                 addDecorItem.dimensions.breadth *
-                                platformPrice.price
+                                platformPrice.price *
+                                (addDecorItem.decorItem?.category === "Pathway"
+                                  ? addDecorItem.quantity
+                                  : 1)
                               : 0) +
                             (addDecorItem.dimensions.length +
                               addDecorItem.dimensions.height) *
@@ -3666,7 +4221,10 @@ export default function Event({ message, setMessage }) {
                                 addDecorItem.dimensions.height) *
                               (flooringPrice.find(
                                 (i) => i.title === addDecorItem.flooring
-                              )?.price || 0)
+                              )?.price || 0) *
+                              (addDecorItem.decorItem?.category === "Pathway"
+                                ? addDecorItem.quantity
+                                : 1)
                           }`}
                         />
                       </div>
@@ -3706,14 +4264,34 @@ export default function Event({ message, setMessage }) {
                             <div className="flex flex-row justify-between">
                               <div>
                                 <p className="text-sm">{item.category}</p>
-                                <p>
-                                  {item?.decor?.name}{" "}
-                                  {item?.productVariant || ""} [
-                                  <span className="font-medium text-sm">
-                                    {item?.decor?.productInfo.id}
-                                  </span>
-                                  ]
-                                </p>
+                                <div className="flex items-center gap-2">
+                                  <p>
+                                    {item?.decor?.name} –{" "}
+                                    {item?.productVariant
+                                      ? item?.productVariant
+                                      : "Default"}{" "}
+                                    [
+                                    <span className="font-medium text-sm">
+                                      {item?.decor?.productInfo.id}
+                                    </span>
+                                    ]
+                                  </p>
+                                  {/* Variant thumbnail (matches “Product – Variant – Variant Image”) */}
+                                  <div className="relative w-10 h-10 rounded-md border border-gray-200 overflow-hidden bg-white">
+                                    <Image
+                                      src={
+                                        item?.productVariant
+                                          ? item?.decor?.productVariants?.find(
+                                              (i) => i.name === item.productVariant
+                                            )?.image || item.decor?.thumbnail
+                                          : item.decor?.thumbnail
+                                      }
+                                      alt="Variant"
+                                      fill
+                                      className="object-contain"
+                                    />
+                                  </div>
+                                </div>
                               </div>
                               {!eventDay.status.approved &&
                                 !event.status.approved && (
@@ -4421,7 +4999,9 @@ export default function Event({ message, setMessage }) {
                                     admin_notes: item.admin_notes,
                                     user_notes: item.user_notes,
                                     notes:
-                                      item.notes.length > 0 ? item.notes : [],
+                                      (item?.notes?.length || 0) > 0
+                                        ? item.notes
+                                        : [],
                                   });
                                 }}
                               >
@@ -4668,7 +5248,7 @@ export default function Event({ message, setMessage }) {
                                             admin_notes: item.admin_notes,
                                             user_notes: item.user_notes,
                                             notes:
-                                              item.notes.length > 0
+                                              (item?.notes?.length || 0) > 0
                                                 ? item.notes
                                                 : [],
                                           });
@@ -4745,7 +5325,7 @@ export default function Event({ message, setMessage }) {
                               package_id: item.package._id,
                               admin_notes: item.admin_notes,
                               user_notes: item.user_notes,
-                              notes: item.notes.length > 0 ? item.notes : [],
+                              notes: (item?.notes?.length || 0) > 0 ? item.notes : [],
                             });
                           }}
                         >
@@ -5364,100 +5944,96 @@ export default function Event({ message, setMessage }) {
                         <Table.HeadCell>Price</Table.HeadCell>
                       </Table.Head>
                       <Table.Body className="divide-y">
-                        {eventDay?.decorItems
-                          ?.sort(
-                            (a, b) =>
-                              [
-                                "Nameboard",
-                                "Entrance",
-                                "Pathway",
-                                "Photobooth",
-                                "Stage",
-                                "Mandap",
-                              ].indexOf(a.category) -
-                              [
-                                "Nameboard",
-                                "Entrance",
-                                "Pathway",
-                                "Photobooth",
-                                "Stage",
-                                "Mandap",
-                              ].indexOf(b.category)
-                          )
-                          .map((item, index) => (
-                            <Table.Row
-                              className="bg-white dark:border-gray-700 dark:bg-gray-800"
-                              key={index}
-                            >
-                              <Table.Cell>{index + 1}</Table.Cell>
-                              <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                                [{item.decor.category}] {item.decor.name}
-                              </Table.Cell>
-                              <Table.Cell>₹{item.price}</Table.Cell>
-                            </Table.Row>
-                          ))}
-                        {eventDay?.packages.map((item, index) => (
-                          <Table.Row
-                            className="bg-white dark:border-gray-700 dark:bg-gray-800"
-                            key={index}
-                          >
-                            <Table.Cell>
-                              {eventDay?.decorItems.length + index + 1}
-                            </Table.Cell>
-                            <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                              [Package] {item.package.name}
-                            </Table.Cell>
-                            <Table.Cell>₹{item.price}</Table.Cell>
-                          </Table.Row>
-                        ))}
-                        {eventDay.customItems.filter(
-                          (i) => !i.includeInTotalSummary
-                        ).length > 0 && (
-                          <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
-                            <Table.Cell>
-                              {eventDay?.decorItems.length +
-                                eventDay?.packages.length +
-                                1}
-                            </Table.Cell>
-                            <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                              {eventDay.customItemsTitle || "ADD ONS"}
-                            </Table.Cell>
-                            <Table.Cell>
-                              ₹
-                              {eventDay?.customItems
-                                .filter((i) => !i.includeInTotalSummary)
-                                .reduce((accumulator, currentValue) => {
-                                  return accumulator + currentValue.price;
-                                }, 0)}
-                            </Table.Cell>
-                          </Table.Row>
-                        )}
-                        {eventDay?.mandatoryItems
-                          .filter(
-                            (i) => i.itemRequired && !i.includeInTotalSummary
-                          )
-                          ?.map((item, index) => (
-                            <Table.Row
-                              className="bg-white dark:border-gray-700 dark:bg-gray-800"
-                              key={index}
-                            >
-                              <Table.Cell>
-                                {eventDay?.decorItems.length +
-                                  eventDay?.packages.length +
-                                  (eventDay.customItems.filter(
-                                    (i) => !i.includeInTotalSummary
-                                  ).length
-                                    ? 1
-                                    : 0) +
-                                  index +
-                                  1}
-                              </Table.Cell>
-                              <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                                {item.description}
-                              </Table.Cell>
-                              <Table.Cell>₹{item.price}</Table.Cell>
-                            </Table.Row>
-                          ))}
+                        {(() => {
+                          // Group decor items by decor.category in the order they were added (first-seen order)
+                          const order = [];
+                          const totals = {};
+                          (eventDay?.decorItems || []).forEach((it) => {
+                            const cat =
+                              it?.decor?.category || it?.category || "Other";
+                            if (!Object.prototype.hasOwnProperty.call(totals, cat)) {
+                              totals[cat] = 0;
+                              order.push(cat);
+                            }
+                            totals[cat] += it?.price || 0;
+                          });
+
+                          const packagesTotal = (eventDay?.packages || []).reduce(
+                            (a, c) => a + (c?.price || 0),
+                            0
+                          );
+                          const customTotal = (eventDay?.customItems || [])
+                            .filter((i) => !i.includeInTotalSummary)
+                            .reduce((a, c) => a + (c?.price || 0), 0);
+                          const mandatoryTotal = (eventDay?.mandatoryItems || [])
+                            .filter((i) => i.itemRequired && !i.includeInTotalSummary)
+                            .reduce((a, c) => a + (c?.price || 0), 0);
+
+                          const rows = [];
+                          order.forEach((cat, idx) => {
+                            rows.push(
+                              <Table.Row
+                                className="bg-white dark:border-gray-700 dark:bg-gray-800"
+                                key={`cat-${cat}`}
+                              >
+                                <Table.Cell>{idx + 1}</Table.Cell>
+                                <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                  {cat}
+                                </Table.Cell>
+                                <Table.Cell>₹{totals[cat]}</Table.Cell>
+                              </Table.Row>
+                            );
+                          });
+
+                          let seq = rows.length;
+                          if (packagesTotal > 0) {
+                            seq += 1;
+                            rows.push(
+                              <Table.Row
+                                className="bg-white dark:border-gray-700 dark:bg-gray-800"
+                                key="packages-total"
+                              >
+                                <Table.Cell>{seq}</Table.Cell>
+                                <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                  Packages
+                                </Table.Cell>
+                                <Table.Cell>₹{packagesTotal}</Table.Cell>
+                              </Table.Row>
+                            );
+                          }
+                          if (customTotal > 0) {
+                            seq += 1;
+                            rows.push(
+                              <Table.Row
+                                className="bg-white dark:border-gray-700 dark:bg-gray-800"
+                                key="custom-total"
+                              >
+                                <Table.Cell>{seq}</Table.Cell>
+                                <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                  {eventDay?.customItemsTitle || "ADD ONS"}
+                                </Table.Cell>
+                                <Table.Cell>₹{customTotal}</Table.Cell>
+                              </Table.Row>
+                            );
+                          }
+                          if (mandatoryTotal > 0) {
+                            seq += 1;
+                            rows.push(
+                              <Table.Row
+                                className="bg-white dark:border-gray-700 dark:bg-gray-800"
+                                key="mandatory-total"
+                              >
+                                <Table.Cell>{seq}</Table.Cell>
+                                <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
+                                  Mandatory Items
+                                </Table.Cell>
+                                <Table.Cell>₹{mandatoryTotal}</Table.Cell>
+                              </Table.Row>
+                            );
+                          }
+
+                          return rows;
+                        })()}
                         <Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
                           <Table.Cell />
                           <Table.Cell className="text-right whitespace-nowrap font-medium text-gray-900 dark:text-white">
@@ -5465,30 +6041,29 @@ export default function Event({ message, setMessage }) {
                           </Table.Cell>
                           <Table.Cell>
                             ₹
-                            {eventDay?.decorItems.reduce(
+                            {(eventDay?.decorItems || []).reduce(
                               (accumulator, currentValue) => {
-                                return accumulator + currentValue.price;
+                                return accumulator + (currentValue?.price || 0);
                               },
                               0
                             ) +
-                              eventDay?.packages.reduce(
+                              (eventDay?.packages || []).reduce(
                                 (accumulator, currentValue) => {
-                                  return accumulator + currentValue.price;
+                                  return accumulator + (currentValue?.price || 0);
                                 },
                                 0
                               ) +
-                              eventDay?.customItems
+                              (eventDay?.customItems || [])
                                 .filter((i) => !i.includeInTotalSummary)
                                 .reduce((accumulator, currentValue) => {
-                                  return accumulator + currentValue.price;
+                                  return accumulator + (currentValue?.price || 0);
                                 }, 0) +
-                              eventDay?.mandatoryItems
-                                ?.filter(
-                                  (i) =>
-                                    i.itemRequired && !i.includeInTotalSummary
+                              (eventDay?.mandatoryItems || [])
+                                .filter(
+                                  (i) => i.itemRequired && !i.includeInTotalSummary
                                 )
-                                ?.reduce((accumulator, currentValue) => {
-                                  return accumulator + currentValue.price;
+                                .reduce((accumulator, currentValue) => {
+                                  return accumulator + (currentValue?.price || 0);
                                 }, 0)}
                           </Table.Cell>
                         </Table.Row>

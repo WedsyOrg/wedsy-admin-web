@@ -399,19 +399,28 @@ export default function MUABookingAmount({
                   <Button
                     color={"failure"}
                     onClick={() => {
+                      // Allow deleting an entry even if user forgot to click "Edit" first.
+                      if (!edit) {
+                        setEditData(data);
+                        setEdit(true);
+                      }
                       setEditData({
-                        ...editData,
+                        ...(edit ? editData : data),
                         bidding: {
-                          ...editData?.bidding,
-                          condition: editData.bidding.condition.filter(
+                          ...(edit ? editData?.bidding : data?.bidding),
+                          condition: (edit
+                            ? editData?.bidding?.condition
+                            : data?.bidding?.condition
+                          ).filter(
                             (rec, recIndex) => recIndex !== index
                           ),
                         },
                       });
                     }}
-                    disabled={loading || !edit}
+                    disabled={loading}
                   >
                     <MdDelete />
+                    <span className="ml-1">Delete</span>
                   </Button>
                 </div>
                 <div className="col-span-1" />

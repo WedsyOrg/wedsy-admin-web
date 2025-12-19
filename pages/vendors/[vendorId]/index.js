@@ -41,6 +41,11 @@ export default function Vendor({ message, setMessage }) {
   const [orderStats, setOrderStats] = useState("today");
   const [businessStats, setBusinessStats] = useState([]);
   const [selectedBusinessMonth, setSelectedBusinessMonth] = useState("");
+  const [orderDayStats, setOrderDayStats] = useState({
+    wedsyPackages: 0,
+    personalPackages: 0,
+    bidding: 0,
+  });
   const fetchTasks = () => {
     setLoading(true);
     fetch(
@@ -334,10 +339,39 @@ export default function Vendor({ message, setMessage }) {
     ]).then((result) => {
       if (result[0]?.message === "success") {
         setBusinessStats(result[0]?.stats);
-        setSelectedBusinessMonth(result[0]?.stats[0]?.month);
+        setSelectedBusinessMonth(result[0]?.stats?.[0]?.month || "");
       }
       setLoading(false);
     });
+  };
+
+  const fetchOrderDayStats = () => {
+    if (!vendorId) return;
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/stats?key=vendor-orders-day&vendor=${vendorId}&day=${orderStats}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+      .then((r) => r.json())
+      .then((resp) => {
+        if (resp?.message === "success") {
+          setOrderDayStats({
+            wedsyPackages: resp?.stats?.wedsyPackages || 0,
+            personalPackages: resp?.stats?.personalPackages || 0,
+            bidding: resp?.stats?.bidding || 0,
+          });
+        } else {
+          setOrderDayStats({ wedsyPackages: 0, personalPackages: 0, bidding: 0 });
+        }
+      })
+      .catch(() => {
+        setOrderDayStats({ wedsyPackages: 0, personalPackages: 0, bidding: 0 });
+      });
   };
   useEffect(() => {
     if (vendorId) {
@@ -348,6 +382,13 @@ export default function Vendor({ message, setMessage }) {
       fetchStats();
     }
   }, [vendorId]);
+
+  useEffect(() => {
+    if (vendorId) {
+      fetchOrderDayStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorId, orderStats]);
   return (
     <>
       {/* Tasks Hstory Modal */}
@@ -534,6 +575,29 @@ export default function Vendor({ message, setMessage }) {
           </div>
           <VendorLastActiveCard vendorId={vendorId} />
         </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <Label value="Bank Name" />
+            <TextInput
+              value={vendor?.accountDetails?.bankName || ""}
+              readOnly={true}
+            />
+          </div>
+          <div>
+            <Label value="Account Number" />
+            <TextInput
+              value={vendor?.accountDetails?.accountNumber || ""}
+              readOnly={true}
+            />
+          </div>
+          <div>
+            <Label value="IFSC Code" />
+            <TextInput
+              value={vendor?.accountDetails?.ifscCode || ""}
+              readOnly={true}
+            />
+          </div>
+        </div>
         <HorizontalLine />
         <div className="grid grid-cols-3 gap-6">
           <div className="grow bg-white rounded-lg border py-3 px-6 text-center flex flex-row gap-2 justify-center">
@@ -572,26 +636,54 @@ export default function Vendor({ message, setMessage }) {
         </div>
         <HorizontalLine />
         <div className="grid grid-cols-5 gap-4">
-          <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
-            <p className="text-gray-800 font-medium">Total Revenue</p>
-            {/* --StatsPending-- */}
-            <p className="text-4xl font-bold">0</p>
-            <p className="flex flex-row gap-1 items-center">
-              <BsArrowUp color="#00AC4F" size={18} />
-              <span className="text-green-600 font-medium">0%</span>
-              <span className="font-medium">this month</span>
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
-            <p className="text-gray-800 font-medium">Avg. Monthly Revenue</p>
-            {/* --StatsPending-- */}
-            <p className="text-4xl py-4 font-bold text-rose-900">0</p>
-          </div>
-          <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
-            <p className="text-gray-800 font-medium">Last Monthly Revenue</p>
-            {/* --StatsPending-- */}
-            <p className="text-4xl py-4 font-bold text-rose-900">0</p>
-          </div>
+          {(() => {
+            const total = (businessStats || []).reduce((acc, i) => {
+              return (
+                acc +
+                (Number(i?.wedsyPackagesAmount || 0) +
+                  Number(i?.personalPackagesAmount || 0) +
+                  Number(i?.biddingAmount || 0))
+              );
+            }, 0);
+            const months = (businessStats || []).length || 0;
+            const avg = months ? Math.round(total / months) : 0;
+            const lastMonthObj =
+              (businessStats || []).length > 0
+                ? businessStats[(businessStats || []).length - 1]
+                : null;
+            const last =
+              (Number(lastMonthObj?.wedsyPackagesAmount || 0) +
+                Number(lastMonthObj?.personalPackagesAmount || 0) +
+                Number(lastMonthObj?.biddingAmount || 0)) ||
+              0;
+            return (
+              <>
+                <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
+                  <p className="text-gray-800 font-medium">Total Revenue</p>
+                  <p className="text-4xl font-bold">{Math.round(total)}</p>
+                  <p className="flex flex-row gap-1 items-center">
+                    <BsArrowUp color="#00AC4F" size={18} />
+                    <span className="text-green-600 font-medium">0%</span>
+                    <span className="font-medium">this month</span>
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
+                  <p className="text-gray-800 font-medium">
+                    Avg. Monthly Revenue
+                  </p>
+                  <p className="text-4xl py-4 font-bold text-rose-900">
+                    {Math.round(avg)}
+                  </p>
+                </div>
+                <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
+                  <p className="text-gray-800 font-medium">Last Monthly Revenue</p>
+                  <p className="text-4xl py-4 font-bold text-rose-900">
+                    {Math.round(last)}
+                  </p>
+                </div>
+              </>
+            );
+          })()}
         </div>
         <HorizontalLine />
         <p className="text-lg font-medium">Orders</p>
@@ -609,18 +701,21 @@ export default function Vendor({ message, setMessage }) {
         <div className="grid grid-cols-6 gap-4">
           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
             <p className="text-gray-800 font-medium">Packages</p>
-            {/* --StatsPending-- */}
-            <p className="text-4xl py-4 font-bold">0</p>
+            <p className="text-4xl py-4 font-bold">
+              {orderDayStats?.wedsyPackages || 0}
+            </p>
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
             <p className="text-gray-800 font-medium">Bids</p>
-            {/* --StatsPending-- */}
-            <p className="text-4xl py-4 font-bold">0</p>
+            <p className="text-4xl py-4 font-bold">
+              {orderDayStats?.bidding || 0}
+            </p>
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-1 text-center">
             <p className="text-gray-800 font-medium">Personal</p>
-            {/* --StatsPending-- */}
-            <p className="text-4xl py-4 font-bold">0</p>
+            <p className="text-4xl py-4 font-bold">
+              {orderDayStats?.personalPackages || 0}
+            </p>
           </div>
         </div>
         <HorizontalLine />

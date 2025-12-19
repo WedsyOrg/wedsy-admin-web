@@ -315,15 +315,14 @@ export default function Vendor({ message, setMessage }) {
         <HorizontalLine />
         <div className="grid grid-cols-5 gap-4">
           <h2 className="text-2xl font-semibold col-span-5">Packages</h2>
-          <Button
-            color="dark"
-            onClick={() => {
-              router.push("/makeup/packages/wedsy-packages/create");
-            }}
-            disabled={loading}
-          >
-            <BsPlus size={16} /> Add Package
-          </Button>
+          <Link href="/makeup/packages/wedsy-packages/create">
+            <Button
+              color="dark"
+              disabled={loading}
+            >
+              <BsPlus size={16} /> Add Package
+            </Button>
+          </Link>
         </div>
         <div className="bg-white rounded-3xl flex-col flex gap-3 shadow-xl">
           <div className="flex flex-row justify-between items-center pt-4 px-12">
