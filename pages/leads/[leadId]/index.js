@@ -536,6 +536,57 @@ export default function Leads({ message, setMessage }) {
       });
   };
 
+  const deleteNoteById = (noteId) => {
+    if (!leadId || !noteId || loading) return;
+    if (!confirm("Delete this note?")) return;
+
+    setLoading(true);
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/enquiry/${leadId}/conversations/${noteId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+      .then((r) => r.json())
+      .then((resp) => {
+        setLoading(false);
+        if (resp?.message === "success") {
+          // If the deleted note was selected for editing, clear selection
+          setActiveNoteId((prev) => (prev === noteId ? null : prev));
+          setNoteEdits((prev) => {
+            const next = { ...prev };
+            delete next[noteId];
+            return next;
+          });
+          fetchLead();
+          setMessage({
+            text: "Note deleted successfully!",
+            status: "success",
+            display: true,
+          });
+        } else {
+          setMessage({
+            text: "Failed to delete note.",
+            status: "failure",
+            display: true,
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Delete note error:", err);
+        setLoading(false);
+        setMessage({
+          text: "Error while deleting note.",
+          status: "failure",
+          display: true,
+        });
+      });
+  };
+
   const isNoteDirty = (() => {
     if (!activeNoteId) return false;
     const d = noteEdits[activeNoteId];
@@ -2057,7 +2108,7 @@ export default function Leads({ message, setMessage }) {
               </div>
 
               {/* Existing action buttons (Create User / Mark Interested / Mark Lost / Delete Lead) */}
-              <div className="flex flex-row gap-4 -mt-2">
+              <div className="flex flex-row gap-4 mt-8 mb-8">
                 {!lead.userCreated && (
                   <Button
                     color={"dark"}
@@ -2285,7 +2336,7 @@ export default function Leads({ message, setMessage }) {
                               className={`w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-700 shadow-sm ${isActive ? "ring-1 ring-green-200" : ""}`}
                             />
                           </div>
-                          <div className="col-span-12 md:col-span-3">
+                          <div className="col-span-12 md:col-span-3 flex items-center gap-3">
                             <input
                               type="datetime-local"
                               value={displayDateTime}
@@ -2326,8 +2377,23 @@ export default function Leads({ message, setMessage }) {
                                   };
                                 });
                               }}
-                              className={`w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 shadow-sm ${isActive ? "ring-1 ring-green-200" : ""}`}
+                              className={`flex-1 w-full h-12 rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-600 shadow-sm ${isActive ? "ring-1 ring-green-200" : ""}`}
                             />
+                            {noteId && (
+                              <button
+                                type="button"
+                                title="Delete note"
+                                disabled={loading}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  deleteNoteById(noteId);
+                                }}
+                                className="p-2 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                              >
+                                <MdDelete className="text-red-600" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
