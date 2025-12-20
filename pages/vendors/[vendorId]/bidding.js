@@ -32,6 +32,10 @@ export default function Vendor({ message, setMessage }) {
   const [vendor, setVendor] = useState({});
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("");
+  const [dateRange, setDateRange] = useState(["", ""]); // [startDate, endDate]
+  const [confirmedFilter, setConfirmedFilter] = useState("");
+  const [chatInitiatedFilter, setChatInitiatedFilter] = useState("");
+  const [list, setList] = useState([]);
   const fetchVendor = () => {
     setLoading(true);
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendor/${vendorId}`, {
@@ -49,6 +53,47 @@ export default function Vendor({ message, setMessage }) {
       .catch((error) => {
         setLoading(false);
         console.error("There was a problem with the fetch operation:", error);
+      });
+  };
+
+  const fetchBiddingList = () => {
+    if (!vendorId) return;
+    setLoading(true);
+    const qp = (k, v) =>
+      v !== undefined && v !== null && String(v).length > 0
+        ? `&${k}=${encodeURIComponent(String(v))}`
+        : "";
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/bidding?vendorId=${encodeURIComponent(
+        String(vendorId)
+      )}${qp("search", search)}${qp("sort", sort)}${qp(
+        "confirmed",
+        confirmedFilter
+      )}${qp("chatInitiated", chatInitiatedFilter)}${qp(
+        "startDate",
+        dateRange[0]
+      )}${qp("endDate", dateRange[1])}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+      .then((r) => r.json())
+      .then((resp) => {
+        if (resp?.message === "success") {
+          setList(resp?.list || []);
+        } else {
+          setList([]);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching bidding list:", err);
+        setList([]);
+        setLoading(false);
       });
   };
   const updateProfileVisibility = (status) => {
@@ -129,8 +174,15 @@ export default function Vendor({ message, setMessage }) {
   useEffect(() => {
     if (vendorId) {
       fetchVendor();
+      fetchBiddingList();
     }
   }, [vendorId]);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    fetchBiddingList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, sort, confirmedFilter, chatInitiatedFilter, dateRange?.[0], dateRange?.[1]]);
   return (
     <>
       <div className="flex flex-col gap-6 p-8">
@@ -190,15 +242,41 @@ export default function Vendor({ message, setMessage }) {
         </div>
         <div className="grid grid-cols-6 gap-4">
           <p className="text-lg font-medium col-span-6">Filter by</p>
-          <Select>
-            <option>Event Date</option>
-          </Select>
-          <Select>
-            <option>Confirmed</option>
-          </Select>
-          <Select>
-            <option>Chat Initiated</option>
-          </Select>
+          <div className="col-span-1">
+            <Label value="Event Date" />
+            <div className="grid grid-cols-1 gap-2">
+              <TextInput
+                type="date"
+                value={dateRange[0]}
+                disabled={loading}
+                onChange={(e) => setDateRange([e.target.value, dateRange[1]])}
+              />
+            </div>
+          </div>
+          <div>
+            <Label value="Confirmed Bids" />
+            <Select
+              value={confirmedFilter}
+              disabled={loading}
+              onChange={(e) => setConfirmedFilter(e.target.value)}
+            >
+              <option value={""}>All</option>
+              <option value={"Yes"}>Yes</option>
+              <option value={"No"}>No</option>
+            </Select>
+          </div>
+          <div>
+            <Label value="Chats Initiated" />
+            <Select
+              value={chatInitiatedFilter}
+              disabled={loading}
+              onChange={(e) => setChatInitiatedFilter(e.target.value)}
+            >
+              <option value={""}>All</option>
+              <option value={"Yes"}>Yes</option>
+              <option value={"No"}>No</option>
+            </Select>
+          </div>
         </div>
         <div className="bg-white rounded-3xl flex-col flex gap-3 shadow-xl">
           <div className="flex flex-row justify-between items-center pt-4 px-12">
@@ -247,7 +325,7 @@ export default function Vendor({ message, setMessage }) {
                 </Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
-                {[]?.map((item, index) => (
+                {list?.map((item, index) => (
                   <Table.Row
                     className="bg-white dark:border-gray-700 dark:bg-gray-800"
                     key={item._id}
@@ -259,17 +337,28 @@ export default function Vendor({ message, setMessage }) {
                         href={`/vendors/${vendorId}/personal-leads/${item._id}`}
                         target="_blank"
                       >
-                        {item.name}
+                        {item?.customer?.name || "-"}
                       </a>
                     </Table.Cell>
-                    <Table.Cell>{item.phone}</Table.Cell>
-                    <Table.Cell>{item.eventInfo[0]?.date}</Table.Cell>
-                    <Table.Cell>{item.eventInfo.length}</Table.Cell>
-                    <Table.Cell></Table.Cell>
-                    <Table.Cell></Table.Cell>
-                    <Table.Cell>Yes/No </Table.Cell>
+                    <Table.Cell>{item?.customer?.phone || "-"}</Table.Cell>
+                    <Table.Cell>{item?.eventDay || "-"}</Table.Cell>
+                    <Table.Cell>{item?.eventsCount || 0}</Table.Cell>
+                    <Table.Cell>{item?.bestBid || 0}</Table.Cell>
+                    <Table.Cell>{item?.bidSent ? "Yes" : "No"}</Table.Cell>
+                    <Table.Cell>{item?.chatInitiated ? "Yes" : "No"}</Table.Cell>
                     <Table.Cell>
-                      <MdArrowRightAlt className="sr-only" />
+                      {item?.chatId ? (
+                        <a
+                          className="font-medium text-cyan-600 hover:underline dark:text-cyan-500 relative"
+                          href={`/chats/${item.chatId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open
+                        </a>
+                      ) : (
+                        <MdArrowRightAlt className="sr-only" />
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}

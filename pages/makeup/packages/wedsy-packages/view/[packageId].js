@@ -154,16 +154,15 @@ export default function Vendor({ message, setMessage }) {
             >
               Delete Package
             </Button>
-            <Button
-              color="dark"
-              onClick={() => {
-                router.push(`/makeup/packages/wedsy-packages/edit/${packageId}`);
-              }}
-              disabled={loading}
-              className="grow"
-            >
+            <Link href={`/makeup/packages/wedsy-packages/edit/${packageId}`}>
+              <Button
+                color="dark"
+                disabled={loading}
+                className="grow"
+              >
               Edit Package
             </Button>
+            </Link>
           </div>
           <div>
             <Label value="Details" />

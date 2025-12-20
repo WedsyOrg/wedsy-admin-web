@@ -30,8 +30,10 @@ import {
   Tooltip,
 } from "flowbite-react";
 import { processMobileNumber } from "@/utils/phoneNumber";
+import { useRouter } from "next/router";
 
 export default function Leads({ user }) {
+  const router = useRouter();
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -231,32 +233,72 @@ export default function Leads({ user }) {
       });
   };
   const handleAddLead = async () => {
-    if (await processMobileNumber(addLeadData.phone)) {
-      setLoading(true);
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry`, {
+    const processedPhone = await processMobileNumber(addLeadData.phone);
+    if (!processedPhone) {
+      alert("Please enter valid mobile number");
+      return;
+    }
+
+    const findExistingLead = async () => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/enquiry?search=${encodeURIComponent(
+          processedPhone
+        )}&page=1&limit=1`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.list?.[0] || null;
+    };
+
+    setLoading(true);
+    try {
+      // If lead exists, open it instead of creating duplicate
+      const existing = await findExistingLead();
+      if (existing?._id) {
+        setIsAddLeadModalOpen(false);
+        setAddLeadData({ name: "", phone: "" });
+        setLoading(false);
+        router.push(`/leads/${existing._id}`);
+        return;
+      }
+
+      // Else create new lead
+      const createRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/enquiry`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           ...addLeadData,
-          phone: processMobileNumber(addLeadData.phone),
+          phone: processedPhone,
           verified: false,
           source: "Admin Dashboard",
         }),
-      })
-        .then((response) => {
-          if (response.ok) {
-            setIsAddLeadModalOpen(false);
-            setAddLeadData({ name: "", phone: "" });
-            fetchList();
-          }
-        })
-        .catch((error) => {
-          console.error("There was a problem with the fetch operation:", error);
-        });
-    } else {
-      alert("Please enter valid mobile number");
+      });
+
+      if (!createRes.ok) {
+        setLoading(false);
+        alert("Failed to add lead");
+        return;
+      }
+
+      // Navigate to newly created lead
+      const created = await findExistingLead();
+      setIsAddLeadModalOpen(false);
+      setAddLeadData({ name: "", phone: "" });
+      setLoading(false);
+      if (created?._id) router.push(`/leads/${created._id}`);
+      else fetchList();
+    } catch (error) {
+      setLoading(false);
+      console.error("There was a problem with the fetch operation:", error);
     }
   };
   useEffect(() => {

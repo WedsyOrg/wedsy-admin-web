@@ -66,6 +66,7 @@ export default function Vendor({ message, setMessage }) {
     groomMakeup: false,
     edit: false,
   });
+  const [specialityList, setSpecialityList] = useState([]);
   const [about, setAbout] = useState({
     experience: "",
     awards: [],
@@ -453,6 +454,21 @@ export default function Vendor({ message, setMessage }) {
         setLoading(false);
         console.error("There was a problem with the fetch operation:", error);
       });
+  };
+
+  const fetchSpecialityList = () => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/vendor-speciality`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    })
+      .then((r) => r.json())
+      .then((resp) => {
+        setSpecialityList(Array.isArray(resp) ? resp : []);
+      })
+      .catch(() => setSpecialityList([]));
   };
   const updateTag = async (tag) => {
     setLoading(true);
@@ -861,6 +877,7 @@ export default function Vendor({ message, setMessage }) {
       fetchVendor();
       fetchTasks();
       fetchTags();
+      fetchSpecialityList();
       fetchLocationData();
       fetchPersonalPackages();
       fetchBookingAmount();
@@ -1165,8 +1182,7 @@ export default function Vendor({ message, setMessage }) {
           </div>
           <div className="">
             <Label value="Speciality in ( eg: south indian, muslim etc. )" />
-            <TextInput
-              placeholder="Speciality in ( eg: south indian, muslim etc. )"
+            <Select
               value={profile.speciality}
               onChange={(e) => {
                 setProfile({
@@ -1175,7 +1191,14 @@ export default function Vendor({ message, setMessage }) {
                 });
               }}
               disabled={loading || !profile.edit}
-            />
+            >
+              <option value="">Select Speciality</option>
+              {specialityList?.map((s) => (
+                <option value={s.title} key={s._id}>
+                  {s.title}
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="">
             <Label value="Services you provide" />

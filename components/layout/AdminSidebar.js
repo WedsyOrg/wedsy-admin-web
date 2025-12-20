@@ -1,5 +1,6 @@
 import { Sidebar } from "flowbite-react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { useState } from "react";
 import {
   HiCash,
@@ -30,228 +31,246 @@ export default function AdminSidebar({ user, onLogout }) {
         } cursor-pointer`}
       />
       <Sidebar.Items className="overflow-y-auto grow flex flex-col no-scrollbar justify-between">
-        <Sidebar.ItemGroup className="overflow-y-auto grow no-scrollbar">
-          <Sidebar.Item
-            href="/"
-            icon={HiChartPie}
-            className={`${displayText ? "" : "[&>span]:hidden"} ${
-              router.pathname === "/"
-                ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                : ""
-            }`}
-          >
-            {displayText && <p>Dashboard</p>}
-          </Sidebar.Item>
-          <Sidebar.Item
-            href="/leads"
-            icon={HiInbox}
-            className={`${displayText ? "" : "[&>span]:hidden"} ${
-              router.pathname.includes("/leads")
-                ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                : ""
-            }`}
-          >
-            {displayText && <p>Leads</p>}
-          </Sidebar.Item>
-          <Sidebar.Item
-            href="/event-tool"
-            icon={HiViewBoards}
-            className={`${displayText ? "" : "[&>span]:hidden"} ${
-              router.pathname.includes("/event-tool")
-                ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                : ""
-            }`}
-          >
-            {displayText && <p>Event Tool</p>}
-          </Sidebar.Item>
-          {user?.roles?.includes("owner") && (
+        <Sidebar.ItemGroup className="overflow-y-auto grow no-scrollbar gap-2">
+          <Link href="/" className="block">
             <Sidebar.Item
-              href="/wedding-store"
-              icon={HiFolder}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/wedding-store")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Wedding Store</p>}
-            </Sidebar.Item>
-          )}
-          <Sidebar.Item
-            href="/tasks"
-            icon={HiClipboardList}
-            className={`${displayText ? "" : "[&>span]:hidden"} ${
-              router.pathname.includes("/tasks")
-                ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                : ""
-            }`}
-          >
-            {displayText && <p>Tasks</p>}
-          </Sidebar.Item>
-          {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/payments"
-              icon={HiCash}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.startsWith("/payments")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Payments (Store)</p>}
-            </Sidebar.Item>
-          )}
-          <Sidebar.Item
-            href="/orders"
-            icon={HiUser}
-            className={`${displayText ? "" : "[&>span]:hidden"} ${
-              router.pathname.startsWith("/orders")
-                ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                : ""
-            }`}
-          >
-            {displayText && <p>Orders (Store)</p>}
-          </Sidebar.Item>
-          {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/settings"
-              icon={HiCog}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/settings")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Settings</p>}
-            </Sidebar.Item>
-          )}
-          {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/makeup/dashboard"
               icon={HiChartPie}
               className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/makeup/dashboard")
+                router.pathname === "/"
                   ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
                   : ""
               }`}
             >
-              {displayText && <p>Makeup Dashboard</p>}
+              {displayText && <p>Dashboard</p>}
             </Sidebar.Item>
+          </Link>
+          <Link href="/leads" className="block">
+            <Sidebar.Item
+              icon={HiInbox}
+              className={`${displayText ? "" : "[&>span]:hidden"} ${
+                router.pathname.includes("/leads")
+                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                  : ""
+              }`}
+            >
+              {displayText && <p>Leads</p>}
+            </Sidebar.Item>
+          </Link>
+          <Link href="/event-tool" className="block">
+            <Sidebar.Item
+              icon={HiViewBoards}
+              className={`${displayText ? "" : "[&>span]:hidden"} ${
+                router.pathname.includes("/event-tool")
+                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                  : ""
+              }`}
+            >
+              {displayText && <p>Event Tool</p>}
+            </Sidebar.Item>
+          </Link>
+          {user?.roles?.includes("owner") && (
+            <Link href="/wedding-store" className="block">
+              <Sidebar.Item
+                icon={HiFolder}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/wedding-store")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Wedding Store</p>}
+              </Sidebar.Item>
+            </Link>
+          )}
+          <Link href="/tasks" className="block">
+            <Sidebar.Item
+              icon={HiClipboardList}
+              className={`${displayText ? "" : "[&>span]:hidden"} ${
+                router.pathname.includes("/tasks")
+                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                  : ""
+              }`}
+            >
+              {displayText && <p>Tasks</p>}
+            </Sidebar.Item>
+          </Link>
+          {user?.roles?.includes("owner") && (
+            <Link href="/payments" className="block">
+              <Sidebar.Item
+                icon={HiCash}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.startsWith("/payments")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Payments (Store)</p>}
+              </Sidebar.Item>
+            </Link>
+          )}
+          <Link href="/orders" className="block">
+            <Sidebar.Item
+              icon={HiUser}
+              className={`${displayText ? "" : "[&>span]:hidden"} ${
+                router.pathname.startsWith("/orders")
+                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                  : ""
+              }`}
+            >
+              {displayText && <p>Orders (Store)</p>}
+            </Sidebar.Item>
+          </Link>
+          {user?.roles?.includes("owner") && (
+            <Link href="/settings" className="block">
+              <Sidebar.Item
+                icon={HiCog}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/settings")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Settings</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/vendors"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/vendors")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Vendors</p>}
-            </Sidebar.Item>
+            <Link href="/makeup/dashboard" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/makeup/dashboard")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Makeup Dashboard</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/chats"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/chats")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Chats</p>}
-            </Sidebar.Item>
+            <Link href="/vendors" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/vendors")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Vendors</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/dummy"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/dummy")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Bidding (Main)</p>}
-            </Sidebar.Item>
+            <Link href="/chats" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/chats")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Chats</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/makeup/packages"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/makeup/packages")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Packages(Main)</p>}
-            </Sidebar.Item>
-          )}
-          <Sidebar.Item
-            href="/makeup/orders"
-            icon={HiChartPie}
-            className={`${displayText ? "" : "[&>span]:hidden"} ${
-              router.pathname.includes("/makeup/orders")
-                ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                : ""
-            }`}
-          >
-            {displayText && <p>Orders (Main)</p>}
-          </Sidebar.Item>
-          {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/makeup/payments"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/makeup/payments")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Payments (Main)</p>}
-            </Sidebar.Item>
+            <Link href="/dummy" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/dummy")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Bidding (Main)</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
+            <Link href="/makeup/packages" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/makeup/packages")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Packages(Main)</p>}
+              </Sidebar.Item>
+            </Link>
+          )}
+          <Link href="/makeup/orders" className="block">
             <Sidebar.Item
-              href="/settlements"
               icon={HiChartPie}
               className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/settlements")
+                router.pathname.includes("/makeup/orders")
                   ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
                   : ""
               }`}
             >
-              {displayText && <p>Settlements</p>}
+              {displayText && <p>Orders (Main)</p>}
             </Sidebar.Item>
+          </Link>
+          {user?.roles?.includes("owner") && (
+            <Link href="/makeup/payments" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/makeup/payments")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Payments (Main)</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/makeup/reviews"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/makeup/reviews")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Reviews</p>}
-            </Sidebar.Item>
+            <Link href="/settlements" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/settlements")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Settlements</p>}
+              </Sidebar.Item>
+            </Link>
           )}
           {user?.roles?.includes("owner") && (
-            <Sidebar.Item
-              href="/community"
-              icon={HiChartPie}
-              className={`${displayText ? "" : "[&>span]:hidden"} ${
-                router.pathname.includes("/community")
-                  ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
-                  : ""
-              }`}
-            >
-              {displayText && <p>Community</p>}
-            </Sidebar.Item>
+            <Link href="/makeup/reviews" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/makeup/reviews")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Reviews</p>}
+              </Sidebar.Item>
+            </Link>
+          )}
+          {user?.roles?.includes("owner") && (
+            <Link href="/community" className="block">
+              <Sidebar.Item
+                icon={HiChartPie}
+                className={`${displayText ? "" : "[&>span]:hidden"} ${
+                  router.pathname.includes("/community")
+                    ? "bg-rose-800 [&>svg]:text-white text-white hover:bg-rose-900"
+                    : ""
+                }`}
+              >
+                {displayText && <p>Community</p>}
+              </Sidebar.Item>
+            </Link>
           )}
         </Sidebar.ItemGroup>
         <Sidebar.ItemGroup className="mt-auto pt-0">

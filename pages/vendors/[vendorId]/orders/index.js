@@ -37,6 +37,9 @@ export default function Vendor({ message, setMessage }) {
   const [totalPages, setTotalPages] = useState(1);
   const [sort, setSort] = useState("");
   const [dateFilter, setDateFilter] = useState(["", ""]);
+  const [sourceFilter, setSourceFilter] = useState(""); // "Personal Lead" | "Personal-Package" | "Wedsy-Package" | "Bidding"
+  const [ordersList, setOrdersList] = useState([]);
+  const [personalLeadsList, setPersonalLeadsList] = useState([]);
   const [addNewNote, setAddNewNote] = useState({
     text: "",
     display: false,
@@ -174,6 +177,84 @@ export default function Vendor({ message, setMessage }) {
       })
       .catch((error) => {
         console.error("There was a problem with the fetch operation:", error);
+      });
+  };
+
+  const fetchOrders = () => {
+    if (!vendorId) return;
+    setLoading(true);
+    const qp = (k, v) =>
+      v !== undefined && v !== null && String(v).length > 0
+        ? `&${k}=${encodeURIComponent(String(v))}`
+        : "";
+
+    // Personal Lead is not an Order row (it comes from vendor-personal-lead)
+    if (sourceFilter === "Personal Lead") {
+      fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/vendor-personal-lead?vendorId=${encodeURIComponent(
+          String(vendorId)
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      )
+        .then((r) => r.json())
+        .then((resp) => {
+          setPersonalLeadsList(Array.isArray(resp) ? resp : []);
+          setOrdersList([]);
+          setTotalPages(1);
+          setLoading(false);
+        })
+        .catch((e) => {
+          console.error("Error fetching personal leads:", e);
+          setPersonalLeadsList([]);
+          setOrdersList([]);
+          setTotalPages(1);
+          setLoading(false);
+        });
+      return;
+    }
+
+    fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/order?vendorId=${encodeURIComponent(
+        String(vendorId)
+      )}${qp("page", page)}${qp("limit", itemsPerPage)}${qp(
+        "sourceFilter",
+        sourceFilter
+      )}${qp("search", search)}${qp("sort", sort)}${
+        dateFilter[0]
+          ? dateFilter[1]
+            ? `&startDate=${encodeURIComponent(
+                String(dateFilter[0])
+              )}&endDate=${encodeURIComponent(String(dateFilter[1]))}`
+            : `&registrationDate=${encodeURIComponent(String(dateFilter[0]))}`
+          : ""
+      }`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      }
+    )
+      .then((r) => r.json())
+      .then((resp) => {
+        setOrdersList(resp?.list || []);
+        setPersonalLeadsList([]);
+        setTotalPages(resp?.totalPages || 1);
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error("Error fetching orders:", e);
+        setOrdersList([]);
+        setPersonalLeadsList([]);
+        setTotalPages(1);
+        setLoading(false);
       });
   };
   const fetchNotifications = () => {
@@ -331,8 +412,14 @@ export default function Vendor({ message, setMessage }) {
       fetchNotifications();
       fetchTasks();
       fetchTags();
+      fetchOrders();
     }
   }, [vendorId]);
+  useEffect(() => {
+    if (!vendorId) return;
+    fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, itemsPerPage, search, sort, sourceFilter, dateFilter?.[0], dateFilter?.[1]]);
   return (
     <>
       <div className="flex flex-col gap-6 p-8">
@@ -454,8 +541,18 @@ export default function Vendor({ message, setMessage }) {
           <p className="font-semibold text-lg">Filter by:</p>
           <div className="grid grid-cols-6 gap-6 gap-y-2">
             <div>
-              <Select disabled={loading}>
+              <Select
+                disabled={loading}
+                value={sourceFilter}
+                onChange={(e) => {
+                  setSourceFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
                 <option value={""}>Select Source</option>
+                <option value={"Personal Lead"}>Personal Lead</option>
+                <option value={"Personal-Package"}>Personal Package</option>
+                <option value={"Wedsy-Package"}>Wedsy Package</option>
                 <option value={"Bidding"}>Bidding</option>
               </Select>
             </div>
@@ -463,18 +560,20 @@ export default function Vendor({ message, setMessage }) {
               <div className="grid grid-cols-2 gap-2">
                 <TextInput
                   type="date"
-                  // value={dateFilter[0]}
-                  // onChange={(e) => {
-                  //   setDateFilter([e.target.value, dateFilter[1]]);
-                  // }}
+                  value={dateFilter[0]}
+                  onChange={(e) => {
+                    setDateFilter([e.target.value, dateFilter[1]]);
+                    setPage(1);
+                  }}
                   disabled={loading}
                 />
                 <TextInput
                   type="date"
-                  // value={dateFilter[1]}
-                  // onChange={(e) => {
-                  //   setDateFilter([dateFilter[0], e.target.value]);
-                  // }}
+                  value={dateFilter[1]}
+                  onChange={(e) => {
+                    setDateFilter([dateFilter[0], e.target.value]);
+                    setPage(1);
+                  }}
                   disabled={loading}
                 />
               </div>
@@ -547,28 +646,53 @@ export default function Vendor({ message, setMessage }) {
                 <Table.HeadCell>Price</Table.HeadCell>
               </Table.Head>
               <Table.Body className="divide-y">
-                {[]?.map((item, index) => (
+                {(sourceFilter === "Personal Lead" ? personalLeadsList : ordersList)?.map(
+                  (item, index) => (
                   <Table.Row
                     className="bg-white dark:border-gray-700 dark:bg-gray-800"
-                    key={item._id}
+                    key={item._id || index}
                   >
                     <Table.Cell>{index + 1}</Table.Cell>
                     <Table.Cell className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
-                      <a
-                        className="font-medium text-cyan-600 hover:underline dark:text-cyan-500 relative"
-                        href={`/vendors/${item._id}`}
-                        target="_blank"
-                      >
-                        {item.name}
-                      </a>
+                      {sourceFilter === "Personal Lead" ? (
+                        <a
+                          className="font-medium text-cyan-600 hover:underline dark:text-cyan-500 relative"
+                          href={`/vendors/${vendorId}/personal-leads/${item._id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {item?.name || "-"}
+                        </a>
+                      ) : (
+                        <span>{item?.user?.name || "-"}</span>
+                      )}
                     </Table.Cell>
-                    <Table.Cell>{item.phone}</Table.Cell>
-                    <Table.Cell>{item.phone}</Table.Cell>
-                    <Table.Cell>{item.phone}</Table.Cell>
-                    <Table.Cell>{item.phone}</Table.Cell>
-                    <Table.Cell>{item.phone}</Table.Cell>
+                    <Table.Cell>
+                      {sourceFilter === "Personal Lead"
+                        ? item?.phone || "-"
+                        : item?.user?.phone || "-"}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {sourceFilter === "Personal Lead"
+                        ? item?.eventInfo?.[0]?.date || "-"
+                        : item?.createdAt
+                        ? new Date(item.createdAt).toLocaleDateString()
+                        : "-"}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {sourceFilter === "Personal Lead"
+                        ? item?.eventInfo?.length || 0
+                        : item?.source || "-"}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {sourceFilter === "Personal Lead"
+                        ? "Personal Lead"
+                        : item?.source || "-"}
+                    </Table.Cell>
+                    <Table.Cell>{item?.amount?.total ?? 0}</Table.Cell>
                   </Table.Row>
-                ))}
+                  )
+                )}
               </Table.Body>
             </Table>
           </div>

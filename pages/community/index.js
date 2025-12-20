@@ -24,7 +24,7 @@ export default function Community({ message, setMessage }) {
   const { view } = router.query;
   const [loading, setLoading] = useState(true);
   const [community, setCommunity] = useState([]);
-  const [expanded, setExpanded] = useState([]);
+  const [expandedId, setExpandedId] = useState("");
   const [vendorCategory, setVendorCategory] = useState([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -320,6 +320,11 @@ export default function Community({ message, setMessage }) {
     fetchVendorCategory();
   }, []);
 
+  // Support deep-linking: /community?view=<communityId>
+  useEffect(() => {
+    if (view) setExpandedId(view);
+  }, [view]);
+
   return (
     <>
       {/* New Communtiy Modal */}
@@ -492,14 +497,15 @@ export default function Community({ message, setMessage }) {
                 (view ? view === i?._id : true)
             )
             .map((item, index) => (
-              <div className="p-6 border rounded-lg divide-y-2" key={index}>
-                <div className="flex flex-col gap-4 pb-4" key={index}>
+              <div className="p-6 border rounded-lg divide-y-2" key={item?._id}>
+                <div className="flex flex-col gap-4 pb-4">
                   <div className="flex flex-row gap-2 items-center">
                     <Avatar rounded size="md" />
                     <div>
                       {item?.author?.anonymous ? (
                         <p className="text-lg font-regule">
-                          Anonymous ({item?.author?.name})
+                          Anonymous
+                          {item?.author?.name ? ` (${item.author.name})` : ""}
                         </p>
                       ) : (
                         <p className="text-lg font-semibold">
@@ -524,15 +530,18 @@ export default function Community({ message, setMessage }) {
                   <p
                     className="text-xl font-semibold cursor-pointer"
                     onClick={() => {
-                      if (expanded.includes(item?._id)) {
-                        setExpanded(expanded.filter((i) => i !== item?._id));
-                      } else {
-                        setExpanded([...expanded, item?._id]);
-                        router.push({
-                          pathname: router.pathname,
-                          query: { ...router.query, view: item?._id },
-                        });
-                      }
+                      setExpandedId((prev) => {
+                        const next = prev === item?._id ? "" : item?._id;
+                        const q = { ...router.query };
+                        if (next) q.view = next;
+                        else delete q.view;
+                        router.push(
+                          { pathname: router.pathname, query: q },
+                          undefined,
+                          { shallow: true }
+                        );
+                        return next;
+                      });
                     }}
                   >
                     {item.title}
@@ -540,11 +549,7 @@ export default function Community({ message, setMessage }) {
                   <p
                     className="-mt-4 cursor-pointer"
                     onClick={() => {
-                      if (expanded.includes(item?._id)) {
-                        setExpanded(expanded.filter((i) => i !== item?._id));
-                      } else {
-                        setExpanded([...expanded, item?._id]);
-                      }
+                      setExpandedId((prev) => (prev === item?._id ? "" : item?._id));
                     }}
                   >
                     {item.body}
@@ -560,7 +565,7 @@ export default function Community({ message, setMessage }) {
                     </Button>
                     <div className="flex flex-row gap-1 items-center">
                       <BsChatLeftText size={24} className="text-rose-900" />
-                      {item?.replies?.length}
+                      {item?.replies?.length ?? 0}
                     </div>
                     {item.liked ? (
                       <div className="flex flex-row gap-1 items-center">
@@ -614,43 +619,42 @@ export default function Community({ message, setMessage }) {
                     )}
                   </div>
                 </div>
-                {expanded.includes(item?._id) && item?.replies?.length > 0 && (
+                {expandedId === item?._id && item?.replies?.length > 0 && (
                   <div className="flex flex-col gap-4 pb-4 px-6 divide-y-2 pl-6">
                     {item?.replies?.map((rec, recIndex) => (
-                      <>
-                        <div
-                          className="flex flex-col gap-4 py-4"
-                          key={recIndex}
-                        >
-                          <div className="flex flex-row gap-2 items-center">
-                            <Avatar rounded size="md" />
-                            <div>
-                              {rec?.author?.anonymous ? (
-                                <p className="text-lg font-regule">
-                                  Anonymous ({rec?.author?.name})
-                                </p>
-                              ) : (
-                                <p className="text-lg font-semibold">
-                                  {rec?.author?.name}
-                                </p>
-                              )}
-                              <p className="text-sm">
-                                {new Date(rec?.createdAt)?.toLocaleString()}{" "}
+                      <div
+                        className="flex flex-col gap-4 py-4"
+                        key={rec?._id || recIndex}
+                      >
+                        <div className="flex flex-row gap-2 items-center">
+                          <Avatar rounded size="md" />
+                          <div>
+                            {rec?.author?.anonymous ? (
+                              <p className="text-lg font-regule">
+                                Anonymous
+                                {rec?.author?.name ? ` (${rec.author.name})` : ""}
                               </p>
-                            </div>
-                            <div className="ml-auto">
-                              <MdDelete
-                                size={24}
-                                onClick={() => {
-                                  deleteCommunityReply(item._id, rec._id);
-                                }}
-                                cursor={"pointer"}
-                              />
-                            </div>
+                            ) : (
+                              <p className="text-lg font-semibold">
+                                {rec?.author?.name}
+                              </p>
+                            )}
+                            <p className="text-sm">
+                              {new Date(rec?.createdAt)?.toLocaleString()}{" "}
+                            </p>
                           </div>
-                          <p className="-mt-2">{rec.reply}</p>
+                          <div className="ml-auto">
+                            <MdDelete
+                              size={24}
+                              onClick={() => {
+                                deleteCommunityReply(item._id, rec._id);
+                              }}
+                              cursor={"pointer"}
+                            />
+                          </div>
                         </div>
-                      </>
+                        <p className="-mt-2">{rec.reply}</p>
+                      </div>
                     ))}
                   </div>
                 )}
