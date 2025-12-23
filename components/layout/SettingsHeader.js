@@ -12,6 +12,12 @@ export default function SettingsHeader({ display, setDisplay }) {
       setDisplayLabel("Colors (Primary & Secondary)");
     } else if (display === "Leads") {
       setDisplayLabel("Lead Information");
+    } else if (display === "Lead-Interest") {
+      setDisplayLabel("Lead Interest");
+    } else if (display === "Lead-Source") {
+      setDisplayLabel("Lead Source");
+    } else if (display === "Lead-Lost-Response") {
+      setDisplayLabel("Lead Lost Response");
     } else if (display === "Event Tool") {
       setDisplayLabel("Event Details");
     } else {

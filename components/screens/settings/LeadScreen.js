@@ -442,7 +442,12 @@ export default function LeadScreen({
     }
   };
   useEffect(() => {
-    if (display === "Leads") {
+    const shouldLoad =
+      display === "Leads" ||
+      display === "Lead-Interest" ||
+      display === "Lead-Source" ||
+      display === "Lead-Lost-Response";
+    if (shouldLoad) {
       fetchLeadSource();
       fetchLeadInterest();
       fetchLeadLostResponse();
@@ -452,6 +457,7 @@ export default function LeadScreen({
     <>
       <div className="bg-white shadow-xl rounded-3xl p-8 w-full flex flex-col gap-4">
         <p className="text-2xl font-medium">Lead Information (ADMIN)</p>
+        {(display === "Leads" || display === "Lead-Lost-Response") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Lead Lost Responses</p>
           <div className="grid grid-cols-4 gap-4">
@@ -488,7 +494,7 @@ export default function LeadScreen({
                   }
                 }}
                 onSave={() => {
-                  if (!loading && editLeadSource.title) {
+                  if (!loading && editLeadLostResponse.title) {
                     updateLeadLostResponse();
                   }
                 }}
@@ -545,6 +551,9 @@ export default function LeadScreen({
             )}
           </div>
         </div>
+        )}
+
+        {(display === "Leads" || display === "Lead-Interest") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Lead Interests</p>
           <div className="grid grid-cols-4 gap-4">
@@ -636,6 +645,9 @@ export default function LeadScreen({
             )}
           </div>
         </div>
+        )}
+
+        {(display === "Leads" || display === "Lead-Source") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Lead Sources</p>
           <div className="grid grid-cols-4 gap-6">
@@ -727,6 +739,7 @@ export default function LeadScreen({
             )}
           </div>
         </div>
+        )}
       </div>
     </>
   );

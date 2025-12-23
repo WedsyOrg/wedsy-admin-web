@@ -19,6 +19,17 @@ import { useState } from "react";
 export default function Settings({ message, setMessage }) {
   const [loading, setLoading] = useState(false);
   const [display, setDisplay] = useState("");
+  const isEventToolSettings =
+    display === "Event Tool" ||
+    display === "Event-Type" ||
+    display === "Event-Community" ||
+    display === "Event-Lost-Response" ||
+    display === "Quantity";
+  const isLeadSettings =
+    display === "Leads" ||
+    display === "Lead-Interest" ||
+    display === "Lead-Source" ||
+    display === "Lead-Lost-Response";
 
   return (
     <>
@@ -154,7 +165,7 @@ export default function Settings({ message, setMessage }) {
           />
         )}
         {/* Event Tool */}
-        {display === "Event Tool" && (
+        {isEventToolSettings && (
           <EventToolScreen
             message={message}
             setMessage={setMessage}
@@ -164,7 +175,7 @@ export default function Settings({ message, setMessage }) {
           />
         )}
         {/* Leads (Lead Information) */}
-        {display === "Leads" && (
+        {isLeadSettings && (
           <LeadScreen
             message={message}
             setMessage={setMessage}

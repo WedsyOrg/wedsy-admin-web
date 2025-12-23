@@ -579,7 +579,13 @@ export default function EventToolScreen({
     }
   };
   useEffect(() => {
-    if (display === "Event Tool") {
+    const shouldLoad =
+      display === "Event Tool" ||
+      display === "Event-Community" ||
+      display === "Event-Type" ||
+      display === "Event-Lost-Response" ||
+      display === "Quantity";
+    if (shouldLoad) {
       fetchEventLostResponse();
       fetchEventCommunity();
       fetchEventTypes();
@@ -590,6 +596,8 @@ export default function EventToolScreen({
     <>
       <div className="bg-white shadow-xl rounded-3xl p-8 w-full flex flex-col gap-4">
         <p className="text-2xl font-medium">Event tool</p>
+
+        {(display === "Event Tool" || display === "Event-Community") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Community (USER)</p>
           <div className="grid grid-cols-4 gap-4">
@@ -683,6 +691,9 @@ export default function EventToolScreen({
             )}
           </div>
         </div>
+        )}
+
+        {(display === "Event Tool" || display === "Event-Type") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Event Type (USER)</p>
           <div className="grid grid-cols-4 gap-4">
@@ -774,6 +785,9 @@ export default function EventToolScreen({
             )}
           </div>
         </div>
+        )}
+
+        {(display === "Event Tool" || display === "Event-Lost-Response") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Event Lost (ADMIN)</p>
           <div className="grid grid-cols-4 gap-6">
@@ -867,6 +881,9 @@ export default function EventToolScreen({
             )}
           </div>
         </div>
+        )}
+
+        {(display === "Event Tool" || display === "Quantity") && (
         <div className="flex flex-col gap-4 border-b-2 pb-3">
           <p className="text-xl font-medium">Quantity</p>
           <div className="grid grid-cols-5 gap-4">
@@ -956,6 +973,7 @@ export default function EventToolScreen({
             )}
           </div>
         </div>
+        )}
       </div>
     </>
   );
