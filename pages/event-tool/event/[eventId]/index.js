@@ -229,11 +229,11 @@ export default function Event({ message, setMessage }) {
         phone
       )}&page=1&limit=1`,
       {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
       }
     )
       .then((res) => (res.ok ? res.json() : null))
@@ -258,8 +258,8 @@ export default function Event({ message, setMessage }) {
       eventDayId && eventDay?._id
         ? [eventDay]
         : Array.isArray(event?.eventDays)
-        ? event.eventDays
-        : [];
+          ? event.eventDays
+          : [];
 
     const rows = [];
     days.forEach((day) => {
@@ -352,9 +352,8 @@ export default function Event({ message, setMessage }) {
   const handleDownloadPdf = () => {
     const includePrice = downloadWithPrice;
     const rows = buildExportRows({ includePrice });
-    const title = `Event ${event?.name || eventId || ""} - ${
-      includePrice ? "With price" : "Without price"
-    }`;
+    const title = `Event ${event?.name || eventId || ""} - ${includePrice ? "With price" : "Without price"
+      }`;
 
     const tableHead = includePrice
       ? `<tr><th>Event Day</th><th>Type</th><th>Item</th><th>Qty</th><th>Price</th></tr>`
@@ -508,9 +507,8 @@ export default function Event({ message, setMessage }) {
       let tempImage = await uploadFile({
         file: resized,
         path: "event-tool/setup-location-image",
-        id: `${new Date().getTime()}-${eventId}-${
-          editDecorSetupLocationImage.decor_id
-        }`,
+        id: `${new Date().getTime()}-${eventId}-${editDecorSetupLocationImage.decor_id
+          }`,
       });
       fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/decor/${eventDayId}/setup-location-image`,
@@ -1389,7 +1387,7 @@ export default function Event({ message, setMessage }) {
         console.error("There was a problem with the fetch operation:", error);
       });
   };
-  const AddDecorItemToEvent = ({}) => {
+  const AddDecorItemToEvent = ({ }) => {
     setLoading(true);
     const pathwayMultiplier =
       addDecorItem?.decorItem?.category === "Pathway" ? addDecorItem.quantity : 1;
@@ -1408,26 +1406,26 @@ export default function Event({ message, setMessage }) {
           dimensions: addDecorItem.dimensions,
           price:
             addDecorItem.quantity *
-              (addDecorItem.decorItem?.productTypes?.find(
-                (i) => i.name === addDecorItem.variant
-              )?.sellingPrice +
-                (addDecorItem.productVariant
-                  ? addDecorItem.decorItem?.productVariants.find(
-                      (i) => i.name === addDecorItem.productVariant
-                    )?.priceModifier
-                  : 0)) +
+            (addDecorItem.decorItem?.productTypes?.find(
+              (i) => i.name === addDecorItem.variant
+            )?.sellingPrice +
+              (addDecorItem.productVariant
+                ? addDecorItem.decorItem?.productVariants.find(
+                  (i) => i.name === addDecorItem.productVariant
+                )?.priceModifier
+                : 0)) +
             (addDecorItem.platform
               ? addDecorItem.dimensions.length *
-                addDecorItem.dimensions.breadth *
-                platformPrice.price *
-                pathwayMultiplier
+              addDecorItem.dimensions.breadth *
+              platformPrice.price *
+              pathwayMultiplier
               : 0) +
             (addDecorItem.dimensions.length + addDecorItem.dimensions.height) *
-              (addDecorItem.dimensions.breadth +
-                addDecorItem.dimensions.height) *
-              (flooringPrice.find((i) => i.title === addDecorItem.flooring)
-                ?.price || 0) *
-              pathwayMultiplier,
+            (addDecorItem.dimensions.breadth +
+              addDecorItem.dimensions.height) *
+            (flooringPrice.find((i) => i.title === addDecorItem.flooring)
+              ?.price || 0) *
+            pathwayMultiplier,
           category: addDecorItem.decorItem?.category || "",
           variant: addDecorItem.variant,
           quantity: addDecorItem.quantity,
@@ -1435,7 +1433,7 @@ export default function Event({ message, setMessage }) {
           platformRate: addDecorItem.platform ? platformPrice?.price : 0,
           flooringRate: addDecorItem.flooring
             ? flooringPrice.find((i) => i.title === addDecorItem.flooring)
-                ?.price || 0
+              ?.price || 0
             : 0,
           decorPrice: addDecorItem.decorItem?.productTypes?.find(
             (i) => i.name === addDecorItem.variant
@@ -1443,8 +1441,8 @@ export default function Event({ message, setMessage }) {
           productVariant: addDecorItem.productVariant || "",
           priceModifier: addDecorItem.productVariant
             ? addDecorItem.decorItem?.productVariants.find(
-                (i) => i.name === addDecorItem.productVariant
-              )?.priceModifier
+              (i) => i.name === addDecorItem.productVariant
+            )?.priceModifier
             : 0,
           included: addDecorItem?.decorItem?.productInfo?.included || [],
         }),
@@ -1458,7 +1456,7 @@ export default function Event({ message, setMessage }) {
             if (ADD_PRODUCT_DRAFT_KEY) {
               sessionStorage.removeItem(ADD_PRODUCT_DRAFT_KEY);
             }
-          } catch (e) {}
+          } catch (e) { }
           fetchEvent();
           setAddDecorItem({
             ...addDecorItem,
@@ -1534,15 +1532,15 @@ export default function Event({ message, setMessage }) {
             (platform
               ? dimensions.length * dimensions.breadth * platformPrice.price
               : 0) *
-              pathwayMultiplier +
+            pathwayMultiplier +
             (dimensions.length + dimensions.height) *
-              (dimensions.breadth + dimensions.height) *
-              (flooringPrice.find((i) => i.title === flooring)?.price || 0) +
+            (dimensions.breadth + dimensions.height) *
+            (flooringPrice.find((i) => i.title === flooring)?.price || 0) +
             (category === "Pathway"
               ? (dimensions.length + dimensions.height) *
-                (dimensions.breadth + dimensions.height) *
-                (flooringPrice.find((i) => i.title === flooring)?.price || 0) *
-                (pathwayMultiplier - 1)
+              (dimensions.breadth + dimensions.height) *
+              (flooringPrice.find((i) => i.title === flooring)?.price || 0) *
+              (pathwayMultiplier - 1)
               : 0) +
             addOns?.reduce((accumulator, currentValue) => {
               return accumulator + currentValue.price;
@@ -1787,11 +1785,11 @@ export default function Event({ message, setMessage }) {
       let tempPrice =
         (tempItem.decorPrice + tempItem.priceModifier) * tempItem.quantity +
         tempItem.dimensions.length *
-          tempItem.dimensions.breadth *
-          tempItem.platformRate +
+        tempItem.dimensions.breadth *
+        tempItem.platformRate +
         (tempItem.dimensions.length + tempItem.dimensions.height) *
-          (tempItem.dimensions.breadth + tempItem.dimensions.height) *
-          tempItem.flooringRate;
+        (tempItem.dimensions.breadth + tempItem.dimensions.height) *
+        tempItem.flooringRate;
       let tempFinalPrice =
         tempPrice +
         editAddOns.addOns?.reduce((accumulator, currentValue) => {
@@ -2089,7 +2087,7 @@ export default function Event({ message, setMessage }) {
         // safety cap: do not store very large payloads
         if (json.length > 25_000) return;
         sessionStorage.setItem(ADD_PRODUCT_DRAFT_KEY, json);
-      } catch (e) {}
+      } catch (e) { }
     }, 400); // debounce typing
 
     return () => clearTimeout(t);
@@ -2144,7 +2142,7 @@ export default function Event({ message, setMessage }) {
         flooringRate: 0,
         decorPrice: 0,
       }));
-    } catch (e) {}
+    } catch (e) { }
   }, [ADD_PRODUCT_DRAFT_KEY, addDecorItem?.display]);
 
   // Google Places Autocomplete for Event Day Venue (edit/add)
@@ -2414,17 +2412,17 @@ export default function Event({ message, setMessage }) {
             {![null, undefined].includes(
               manageEventAccess.addNewEventAccess
             ) && (
-              <TextInput
-                value={manageEventAccess.addNewEventAccess}
-                disabled={loading}
-                onChange={(e) => {
-                  setManageEventAccess({
-                    ...manageEventAccess,
-                    addNewEventAccess: e.target.value,
-                  });
-                }}
-              />
-            )}
+                <TextInput
+                  value={manageEventAccess.addNewEventAccess}
+                  disabled={loading}
+                  onChange={(e) => {
+                    setManageEventAccess({
+                      ...manageEventAccess,
+                      addNewEventAccess: e.target.value,
+                    });
+                  }}
+                />
+              )}
             <Button
               color={
                 [null, undefined].includes(manageEventAccess.addNewEventAccess)
@@ -3009,7 +3007,7 @@ export default function Event({ message, setMessage }) {
               disabled={loading}
               onClick={() => {
                 navigator.clipboard
-                  .writeText(`https://wedsy.in/event/${event?._id}/view`)
+                  .writeText(`https://www.wedsy.in/event/${event?._id}/view`)
                   .then(
                     () => {
                       setCopied(true);
@@ -3269,7 +3267,7 @@ export default function Event({ message, setMessage }) {
                     placeholder="Event Name"
                     value={
                       editEventDayInfo.edit &&
-                      editEventDayInfo.eventDay === rec._id
+                        editEventDayInfo.eventDay === rec._id
                         ? editEventDayInfo.name
                         : rec.name
                     }
@@ -3292,7 +3290,7 @@ export default function Event({ message, setMessage }) {
                     type="date"
                     value={
                       editEventDayInfo.edit &&
-                      editEventDayInfo.eventDay === rec._id
+                        editEventDayInfo.eventDay === rec._id
                         ? editEventDayInfo.date
                         : rec.date
                     }
@@ -3315,7 +3313,7 @@ export default function Event({ message, setMessage }) {
                     type="time"
                     value={
                       editEventDayInfo.edit &&
-                      editEventDayInfo.eventDay === rec._id
+                        editEventDayInfo.eventDay === rec._id
                         ? editEventDayInfo.time
                         : rec.time
                     }
@@ -3337,7 +3335,7 @@ export default function Event({ message, setMessage }) {
                     placeholder="Location (Google)"
                     value={
                       editEventDayInfo.edit &&
-                      editEventDayInfo.eventDay === rec._id
+                        editEventDayInfo.eventDay === rec._id
                         ? editEventDayInfo.venue
                         : rec.venue
                     }
@@ -3369,7 +3367,7 @@ export default function Event({ message, setMessage }) {
                     placeholder="Event Space (e.g., Imperia Hall)"
                     value={
                       editEventDayInfo.edit &&
-                      editEventDayInfo.eventDay === rec._id
+                        editEventDayInfo.eventDay === rec._id
                         ? editEventDayInfo.eventSpace
                         : rec?.eventSpace || ""
                     }
@@ -3390,30 +3388,30 @@ export default function Event({ message, setMessage }) {
                   <div className="flex col-span-2 gap-3 items-center flex-wrap">
                     {(!editEventDayInfo.edit ||
                       editEventDayInfo.eventDay !== rec._id) && (
-                      <Button
-                        color="dark"
-                        onClick={() => {
-                          setEditEventDayInfo({
-                            edit: true,
-                            name: rec.name,
-                            date: rec.date,
-                            venue: rec.venue,
-                            eventSpace: rec?.eventSpace || "",
-                            location:
-                              rec?.location || {
-                                place_id: "",
-                                formatted_address: rec.venue || "",
-                                geometry: { lat: 0, lng: 0 },
-                              },
-                            time: rec.time,
-                            eventDay: rec._id,
-                          });
-                        }}
-                        disabled={loading}
-                      >
-                        Edit
-                      </Button>
-                    )}
+                        <Button
+                          color="dark"
+                          onClick={() => {
+                            setEditEventDayInfo({
+                              edit: true,
+                              name: rec.name,
+                              date: rec.date,
+                              venue: rec.venue,
+                              eventSpace: rec?.eventSpace || "",
+                              location:
+                                rec?.location || {
+                                  place_id: "",
+                                  formatted_address: rec.venue || "",
+                                  geometry: { lat: 0, lng: 0 },
+                                },
+                              time: rec.time,
+                              eventDay: rec._id,
+                            });
+                          }}
+                          disabled={loading}
+                        >
+                          Edit
+                        </Button>
+                      )}
                     {editEventDayInfo.edit &&
                       editEventDayInfo.eventDay === rec._id && (
                         <>
@@ -3672,13 +3670,13 @@ export default function Event({ message, setMessage }) {
                     value={
                       tasks.length > 0
                         ? `${new Date(tasks[tasks.length - 1]?.deadline).toLocaleDateString(
-                            "en-GB"
-                          )}  ${new Date(
-                            tasks[tasks.length - 1]?.deadline
-                          ).toLocaleTimeString("en-GB", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}`
+                          "en-GB"
+                        )}  ${new Date(
+                          tasks[tasks.length - 1]?.deadline
+                        ).toLocaleTimeString("en-GB", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}`
                         : ""
                     }
                   />
@@ -3819,9 +3817,8 @@ export default function Event({ message, setMessage }) {
                 <div className="flex gap-3">
                   <Button
                     color="light"
-                    className={`!bg-[#B5B5B5] !text-black hover:!bg-[#B5B5B5]/80 focus:!ring-0 ${
-                      downloadWithPrice ? "!opacity-100" : "!opacity-80"
-                    }`}
+                    className={`!bg-[#B5B5B5] !text-black hover:!bg-[#B5B5B5]/80 focus:!ring-0 ${downloadWithPrice ? "!opacity-100" : "!opacity-80"
+                      }`}
                     onClick={() => setDownloadWithPrice(true)}
                     disabled={loading}
                   >
@@ -3834,9 +3831,8 @@ export default function Event({ message, setMessage }) {
                   </Button>
                   <Button
                     color="light"
-                    className={`!bg-[#B5B5B5] !text-black hover:!bg-[#B5B5B5]/80 focus:!ring-0 ${
-                      !downloadWithPrice ? "!opacity-100" : "!opacity-80"
-                    }`}
+                    className={`!bg-[#B5B5B5] !text-black hover:!bg-[#B5B5B5]/80 focus:!ring-0 ${!downloadWithPrice ? "!opacity-100" : "!opacity-80"
+                      }`}
                     onClick={() => setDownloadWithPrice(false)}
                     disabled={loading}
                   >
@@ -3928,7 +3924,7 @@ export default function Event({ message, setMessage }) {
                       if (ADD_PRODUCT_DRAFT_KEY) {
                         sessionStorage.removeItem(ADD_PRODUCT_DRAFT_KEY);
                       }
-                    } catch (e) {}
+                    } catch (e) { }
                     setAddDecorItem({
                       ...addDecorItem,
                       display: false,
@@ -4030,79 +4026,79 @@ export default function Event({ message, setMessage }) {
                             </div>
                             {addDecorItem.decorItem?.productVariants.length >
                               0 && (
-                              <div>
-                                <Label value="Select Variant" />
-                                <Select
-                                  value={addDecorItem.productVariant}
-                                  onChange={(e) => {
-                                    setAddDecorItem({
-                                      ...addDecorItem,
-                                      productVariant: e.target.value,
-                                    });
-                                  }}
-                                  disabled={loading}
-                                >
-                                  <option value={""} disabled>
-                                    Select Variant
-                                  </option>
-                                  {addDecorItem.decorItem?.productVariants?.map(
-                                    (item) => (
-                                      <option value={item.name} key={item.name}>
-                                        {item.name} : {item?.priceModifier}
-                                      </option>
-                                    )
-                                  )}
-                                </Select>
-                              </div>
-                            )}
-                            {["Stage", "Photobooth", "Mandap"].includes(
-                              addDecorItem.decorItem.category
-                            ) && (
-                              <>
                                 <div>
-                                  <Label value="Select Platform" />
+                                  <Label value="Select Variant" />
                                   <Select
-                                    value={addDecorItem.platform ? "Yes" : "No"}
+                                    value={addDecorItem.productVariant}
                                     onChange={(e) => {
                                       setAddDecorItem({
                                         ...addDecorItem,
-                                        platform: e.target.value === "Yes",
+                                        productVariant: e.target.value,
                                       });
                                     }}
                                     disabled={loading}
                                   >
                                     <option value={""} disabled>
-                                      Select Platform
+                                      Select Variant
                                     </option>
-                                    <option value={"Yes"}>Yes</option>
-                                    <option value={"No"}>No</option>
+                                    {addDecorItem.decorItem?.productVariants?.map(
+                                      (item) => (
+                                        <option value={item.name} key={item.name}>
+                                          {item.name} : {item?.priceModifier}
+                                        </option>
+                                      )
+                                    )}
                                   </Select>
                                 </div>
-                                <div>
-                                  <Label value="Select Flooring" />
-                                  <Select
-                                    value={addDecorItem.flooring}
-                                    onChange={(e) => {
-                                      setAddDecorItem({
-                                        ...addDecorItem,
-                                        flooring: e.target.value,
-                                      });
-                                    }}
-                                    disabled={loading}
-                                  >
-                                    <option value={""}>Select Flooring</option>
-                                    {flooringPrice.map((item) => (
-                                      <option
-                                        value={item.title}
-                                        key={item.title}
-                                      >
-                                        {item.title}
+                              )}
+                            {["Stage", "Photobooth", "Mandap"].includes(
+                              addDecorItem.decorItem.category
+                            ) && (
+                                <>
+                                  <div>
+                                    <Label value="Select Platform" />
+                                    <Select
+                                      value={addDecorItem.platform ? "Yes" : "No"}
+                                      onChange={(e) => {
+                                        setAddDecorItem({
+                                          ...addDecorItem,
+                                          platform: e.target.value === "Yes",
+                                        });
+                                      }}
+                                      disabled={loading}
+                                    >
+                                      <option value={""} disabled>
+                                        Select Platform
                                       </option>
-                                    ))}
-                                  </Select>
-                                </div>
-                              </>
-                            )}
+                                      <option value={"Yes"}>Yes</option>
+                                      <option value={"No"}>No</option>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label value="Select Flooring" />
+                                    <Select
+                                      value={addDecorItem.flooring}
+                                      onChange={(e) => {
+                                        setAddDecorItem({
+                                          ...addDecorItem,
+                                          flooring: e.target.value,
+                                        });
+                                      }}
+                                      disabled={loading}
+                                    >
+                                      <option value={""}>Select Flooring</option>
+                                      {flooringPrice.map((item) => (
+                                        <option
+                                          value={item.title}
+                                          key={item.title}
+                                        >
+                                          {item.title}
+                                        </option>
+                                      ))}
+                                    </Select>
+                                  </div>
+                                </>
+                              )}
                             {addDecorItem.decorItem.category === "Pathway" && (
                               <div>
                                 <Label value="Select Quantity" />
@@ -4200,32 +4196,31 @@ export default function Event({ message, setMessage }) {
                           Add Product
                         </Button>
                         <Label
-                          value={`Total Price: ${
-                            (addDecorItem.variant
+                          value={`Total Price: ${(addDecorItem.variant
                               ? addDecorItem.quantity *
-                                addDecorItem.decorItem?.productTypes?.find(
-                                  (i) => i.name === addDecorItem.variant
-                                )?.sellingPrice
+                              addDecorItem.decorItem?.productTypes?.find(
+                                (i) => i.name === addDecorItem.variant
+                              )?.sellingPrice
                               : 0) +
                             (addDecorItem.platform
                               ? addDecorItem.dimensions.length *
-                                addDecorItem.dimensions.breadth *
-                                platformPrice.price *
-                                (addDecorItem.decorItem?.category === "Pathway"
-                                  ? addDecorItem.quantity
-                                  : 1)
-                              : 0) +
-                            (addDecorItem.dimensions.length +
-                              addDecorItem.dimensions.height) *
-                              (addDecorItem.dimensions.breadth +
-                                addDecorItem.dimensions.height) *
-                              (flooringPrice.find(
-                                (i) => i.title === addDecorItem.flooring
-                              )?.price || 0) *
+                              addDecorItem.dimensions.breadth *
+                              platformPrice.price *
                               (addDecorItem.decorItem?.category === "Pathway"
                                 ? addDecorItem.quantity
                                 : 1)
-                          }`}
+                              : 0) +
+                            (addDecorItem.dimensions.length +
+                              addDecorItem.dimensions.height) *
+                            (addDecorItem.dimensions.breadth +
+                              addDecorItem.dimensions.height) *
+                            (flooringPrice.find(
+                              (i) => i.title === addDecorItem.flooring
+                            )?.price || 0) *
+                            (addDecorItem.decorItem?.category === "Pathway"
+                              ? addDecorItem.quantity
+                              : 1)
+                            }`}
                         />
                       </div>
                     </div>
@@ -4282,8 +4277,8 @@ export default function Event({ message, setMessage }) {
                                       src={
                                         item?.productVariant
                                           ? item?.decor?.productVariants?.find(
-                                              (i) => i.name === item.productVariant
-                                            )?.image || item.decor?.thumbnail
+                                            (i) => i.name === item.productVariant
+                                          )?.image || item.decor?.thumbnail
                                           : item.decor?.thumbnail
                                       }
                                       alt="Variant"
@@ -4297,9 +4292,8 @@ export default function Event({ message, setMessage }) {
                                 !event.status.approved && (
                                   <MdDelete
                                     cursor={"pointer"}
-                                    className={`${
-                                      loading ? `text-red-400` : `text-red-600`
-                                    } font-bold text-2xl`}
+                                    className={`${loading ? `text-red-400` : `text-red-600`
+                                      } font-bold text-2xl`}
                                     onClick={() => {
                                       if (!loading) {
                                         if (
@@ -4322,8 +4316,8 @@ export default function Event({ message, setMessage }) {
                                   src={
                                     item?.productVariant
                                       ? item?.decor?.productVariants?.find(
-                                          (i) => i.name === item.productVariant
-                                        )?.image || item.decor?.thumbnail
+                                        (i) => i.name === item.productVariant
+                                      )?.image || item.decor?.thumbnail
                                       : item.decor?.thumbnail
                                   }
                                   alt="Decor"
@@ -4335,9 +4329,9 @@ export default function Event({ message, setMessage }) {
                                     setEnlargedImage(
                                       item?.productVariant
                                         ? item?.decor?.productVariants?.find(
-                                            (i) =>
-                                              i.name === item.productVariant
-                                          )?.image || item.decor?.thumbnail
+                                          (i) =>
+                                            i.name === item.productVariant
+                                        )?.image || item.decor?.thumbnail
                                         : item.decor?.thumbnail
                                     );
                                   }}
@@ -4347,14 +4341,13 @@ export default function Event({ message, setMessage }) {
                                 <div className="text-sm flex justify-between mb-2">
                                   Inclusive of:
                                   {item.decor?._id ===
-                                  editDecorIncluded.decor_id ? (
+                                    editDecorIncluded.decor_id ? (
                                     <MdDone
                                       cursor={"pointer"}
-                                      className={`${
-                                        loading
+                                      className={`${loading
                                           ? `text-green-400`
                                           : `text-green-600`
-                                      } font-bold text-2xl`}
+                                        } font-bold text-2xl`}
                                       onClick={() => {
                                         if (!loading) {
                                           UpdateDecorIncluded();
@@ -4364,11 +4357,10 @@ export default function Event({ message, setMessage }) {
                                   ) : (
                                     <MdEdit
                                       cursor={"pointer"}
-                                      className={`${
-                                        loading
+                                      className={`${loading
                                           ? `text-blue-400`
                                           : `text-blue-600`
-                                      } font-bold text-2xl`}
+                                        } font-bold text-2xl`}
                                       onClick={() => {
                                         if (!loading) {
                                           setEditDecorIncluded({
@@ -4385,7 +4377,7 @@ export default function Event({ message, setMessage }) {
                                   rows={4}
                                   value={
                                     item.decor?._id ===
-                                    editDecorIncluded.decor_id
+                                      editDecorIncluded.decor_id
                                       ? editDecorIncluded.included
                                       : item.included?.join("\n")
                                   }
@@ -4452,14 +4444,14 @@ export default function Event({ message, setMessage }) {
                                 {!item.decor?.productTypes.find(
                                   (i) => i.name === item.variant
                                 )?.name && (
-                                  <option
-                                    key={item.variant}
-                                    value={item.variant}
-                                  >
-                                    {item.variant} (
-                                    {toPriceString(item.decorPrice)})
-                                  </option>
-                                )}
+                                    <option
+                                      key={item.variant}
+                                      value={item.variant}
+                                    >
+                                      {item.variant} (
+                                      {toPriceString(item.decorPrice)})
+                                    </option>
+                                  )}
                                 {item.decor?.productTypes.map((variant) => (
                                   <option
                                     key={variant.name}
@@ -4473,70 +4465,70 @@ export default function Event({ message, setMessage }) {
                               {categoryList?.find(
                                 (i) => i.name === item.category
                               )?.multipleAllowed && (
-                                <div className="flex flex-row items-center gap-2">
-                                  <Select
-                                    value={item.quantity.toString()}
-                                    disabled={
-                                      loading ||
-                                      eventDay.status.approved ||
-                                      event.status.approved
-                                    }
-                                    onChange={(e) => {
-                                      let {
-                                        platform,
-                                        platformRate,
-                                        flooring,
-                                        flooringRate,
-                                        dimensions,
-                                        category,
-                                        unit,
-                                        addOns,
-                                        variant,
-                                        decorPrice,
-                                        productVariant,
-                                        priceModifier,
-                                      } = item;
-                                      UpdateDecorItemInEvent({
-                                        decor_id: item.decor?._id,
-                                        platform,
-                                        platformRate,
-                                        flooring,
-                                        flooringRate,
-                                        decorPrice,
-                                        dimensions,
-                                        quantity: parseInt(e.target.value),
-                                        variant,
-                                        category,
-                                        unit,
-                                        addOns,
-                                        productVariant,
-                                        priceModifier,
-                                      });
-                                    }}
-                                  >
-                                    <option value={item.quantity}>
-                                      {item.quantity}
-                                    </option>
-                                    {quantityList
-                                      .sort(
-                                        (a, b) =>
-                                          parseInt(a.title) - parseInt(b.title)
-                                      )
-                                      .filter(
-                                        (i) =>
-                                          i.title !== item.quantity.toString()
-                                      )
-                                      .map((i) => (
-                                        <option key={i.title} value={i.title}>
-                                          {i.title}
-                                        </option>
-                                      ))}
-                                  </Select>
-                                  <Label
-                                    value={`Quantity (Unit: ${item?.decor?.unit})`}
-                                  />
-                                </div>
-                              )}
+                                  <div className="flex flex-row items-center gap-2">
+                                    <Select
+                                      value={item.quantity.toString()}
+                                      disabled={
+                                        loading ||
+                                        eventDay.status.approved ||
+                                        event.status.approved
+                                      }
+                                      onChange={(e) => {
+                                        let {
+                                          platform,
+                                          platformRate,
+                                          flooring,
+                                          flooringRate,
+                                          dimensions,
+                                          category,
+                                          unit,
+                                          addOns,
+                                          variant,
+                                          decorPrice,
+                                          productVariant,
+                                          priceModifier,
+                                        } = item;
+                                        UpdateDecorItemInEvent({
+                                          decor_id: item.decor?._id,
+                                          platform,
+                                          platformRate,
+                                          flooring,
+                                          flooringRate,
+                                          decorPrice,
+                                          dimensions,
+                                          quantity: parseInt(e.target.value),
+                                          variant,
+                                          category,
+                                          unit,
+                                          addOns,
+                                          productVariant,
+                                          priceModifier,
+                                        });
+                                      }}
+                                    >
+                                      <option value={item.quantity}>
+                                        {item.quantity}
+                                      </option>
+                                      {quantityList
+                                        .sort(
+                                          (a, b) =>
+                                            parseInt(a.title) - parseInt(b.title)
+                                        )
+                                        .filter(
+                                          (i) =>
+                                            i.title !== item.quantity.toString()
+                                        )
+                                        .map((i) => (
+                                          <option key={i.title} value={i.title}>
+                                            {i.title}
+                                          </option>
+                                        ))}
+                                    </Select>
+                                    <Label
+                                      value={`Quantity (Unit: ${item?.decor?.unit})`}
+                                    />
+                                  </div>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
@@ -4675,8 +4667,8 @@ export default function Event({ message, setMessage }) {
                                         e.target.value === ""
                                           ? 0
                                           : flooringPrice.find(
-                                              (i) => i.title === e.target.value
-                                            )?.price,
+                                            (i) => i.title === e.target.value
+                                          )?.price,
                                       decorPrice,
                                       dimensions,
                                       quantity,
@@ -4717,7 +4709,7 @@ export default function Event({ message, setMessage }) {
                                 <TextInput
                                   value={
                                     editDecorDimensions.decor_id ===
-                                    item.decor?._id
+                                      item.decor?._id
                                       ? editDecorDimensions.length
                                       : item.dimensions.length
                                   }
@@ -4743,7 +4735,7 @@ export default function Event({ message, setMessage }) {
                                 <TextInput
                                   value={
                                     editDecorDimensions.decor_id ===
-                                    item.decor?._id
+                                      item.decor?._id
                                       ? editDecorDimensions.breadth
                                       : item.dimensions.breadth
                                   }
@@ -4769,7 +4761,7 @@ export default function Event({ message, setMessage }) {
                                 <TextInput
                                   value={
                                     editDecorDimensions.decor_id ===
-                                    item.decor?._id
+                                      item.decor?._id
                                       ? editDecorDimensions.height
                                       : item.dimensions.height
                                   }
@@ -4792,7 +4784,7 @@ export default function Event({ message, setMessage }) {
                               </div>
                               <div className="mt-auto mb-2">
                                 {editDecorDimensions.decor_id ===
-                                item.decor?._id ? (
+                                  item.decor?._id ? (
                                   <Button
                                     color="success"
                                     disabled={
@@ -5084,11 +5076,10 @@ export default function Event({ message, setMessage }) {
                                   <div className="flex flex-row items-center gap-1 justify-between">
                                     <MdOutlineImage
                                       cursor={"pointer"}
-                                      className={`${
-                                        loading
+                                      className={`${loading
                                           ? `text-gray-400`
                                           : `text-gray-600`
-                                      } font-bold text-xl`}
+                                        } font-bold text-xl`}
                                       onClick={() => {
                                         if (
                                           !loading &&
@@ -5113,11 +5104,10 @@ export default function Event({ message, setMessage }) {
                                       !event.status.approved && (
                                         <MdDelete
                                           cursor={"pointer"}
-                                          className={`${
-                                            loading
+                                          className={`${loading
                                               ? `text-red-400`
                                               : `text-red-600`
-                                          } font-bold text-2xl`}
+                                            } font-bold text-2xl`}
                                           onClick={() => {
                                             if (!loading) {
                                               if (
@@ -5139,9 +5129,9 @@ export default function Event({ message, setMessage }) {
                                       src={
                                         item?.productVariant
                                           ? item?.decor?.productVariants?.find(
-                                              (i) =>
-                                                i.name === item.productVariant
-                                            )?.image || item.decor?.thumbnail
+                                            (i) =>
+                                              i.name === item.productVariant
+                                          )?.image || item.decor?.thumbnail
                                           : item.decor?.thumbnail
                                       }
                                       alt="Decor"
@@ -5153,9 +5143,9 @@ export default function Event({ message, setMessage }) {
                                         setEnlargedImage(
                                           item?.productVariant
                                             ? item?.decor?.productVariants?.find(
-                                                (i) =>
-                                                  i.name === item.productVariant
-                                              )?.image || item.decor?.thumbnail
+                                              (i) =>
+                                                i.name === item.productVariant
+                                            )?.image || item.decor?.thumbnail
                                             : item.decor?.thumbnail
                                         );
                                       }}
@@ -5377,8 +5367,8 @@ export default function Event({ message, setMessage }) {
                                       ₹
                                       {rec.platform
                                         ? rec.dimensions.length *
-                                          rec.dimensions.breadth *
-                                          rec.platformRate
+                                        rec.dimensions.breadth *
+                                        rec.platformRate
                                         : 0}
                                     </p>
                                   )}
@@ -5387,10 +5377,10 @@ export default function Event({ message, setMessage }) {
                                       ₹
                                       {rec.flooring
                                         ? (rec.dimensions.length +
-                                            rec.dimensions.height) *
-                                          (rec.dimensions.breadth +
-                                            rec.dimensions.height) *
-                                          rec.flooringRate
+                                          rec.dimensions.height) *
+                                        (rec.dimensions.breadth +
+                                          rec.dimensions.height) *
+                                        rec.flooringRate
                                         : 0}
                                     </p>
                                   )}
@@ -5481,9 +5471,8 @@ export default function Event({ message, setMessage }) {
                               />
                               <MdOutlineImage
                                 cursor={"pointer"}
-                                className={`${
-                                  loading ? `text-gray-400` : `text-gray-600`
-                                } font-bold text-3xl`}
+                                className={`${loading ? `text-gray-400` : `text-gray-600`
+                                  } font-bold text-3xl`}
                                 onClick={() => {
                                   if (
                                     !loading &&
@@ -5724,26 +5713,26 @@ export default function Event({ message, setMessage }) {
                           {customItems[
                             customItemSetupLocationImageUpload.itemIndex
                           ]?.setupLocationImage && (
-                            <Image
-                              src={
-                                customItems[
-                                  customItemSetupLocationImageUpload.itemIndex
-                                ]?.setupLocationImage
-                              }
-                              alt="Decor"
-                              sizes="100%"
-                              width={0}
-                              height={0}
-                              className="w-full h-auto cursor-pointer"
-                              onClick={() => {
-                                setEnlargedImage(
+                              <Image
+                                src={
                                   customItems[
                                     customItemSetupLocationImageUpload.itemIndex
                                   ]?.setupLocationImage
-                                );
-                              }}
-                            />
-                          )}
+                                }
+                                alt="Decor"
+                                sizes="100%"
+                                width={0}
+                                height={0}
+                                className="w-full h-auto cursor-pointer"
+                                onClick={() => {
+                                  setEnlargedImage(
+                                    customItems[
+                                      customItemSetupLocationImageUpload.itemIndex
+                                    ]?.setupLocationImage
+                                  );
+                                }}
+                              />
+                            )}
                           <div className="mb-2 block">
                             <Label value="Upload Image" />
                           </div>
@@ -6369,7 +6358,7 @@ export default function Event({ message, setMessage }) {
                   {event?.status?.finalized &&
                     !event?.status?.approved &&
                     event?.eventDays?.filter((i) => i.status.approved).length ==
-                      0 && (
+                    0 && (
                       <Button
                         color="failure"
                         onClick={() => {
