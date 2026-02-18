@@ -3005,18 +3005,39 @@ export default function Event({ message, setMessage }) {
               color="light"
               className="whitespace-nowrap"
               disabled={loading}
-              onClick={() => {
-                navigator.clipboard
-                  .writeText(`https://www.wedsy.in/event/${event?._id}/view`)
-                  .then(
-                    () => {
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    },
-                    (err) => {
-                      console.error("Failed to copy text: ", err);
+              onClick={async () => {
+                try {
+                  // Generate a share token
+                  const response = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL}/event/${event?._id}/share`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                        authorization: `Bearer ${localStorage.getItem("token")}`,
+                      },
+                      body: JSON.stringify({
+                        name: "Admin Share",
+                        phone: "",
+                        email: "",
+                        relationship: "Admin"
+                      }),
                     }
                   );
+
+                  const data = await response.json();
+
+                  if (data.message === "success" && data.shareLink) {
+                    // Copy the link with share token
+                    await navigator.clipboard.writeText(data.shareLink);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  } else {
+                    console.error("Failed to generate share link");
+                  }
+                } catch (err) {
+                  console.error("Failed to copy text: ", err);
+                }
               }}
             >
               {copied ? (
@@ -4197,11 +4218,11 @@ export default function Event({ message, setMessage }) {
                         </Button>
                         <Label
                           value={`Total Price: ${(addDecorItem.variant
-                              ? addDecorItem.quantity *
-                              addDecorItem.decorItem?.productTypes?.find(
-                                (i) => i.name === addDecorItem.variant
-                              )?.sellingPrice
-                              : 0) +
+                            ? addDecorItem.quantity *
+                            addDecorItem.decorItem?.productTypes?.find(
+                              (i) => i.name === addDecorItem.variant
+                            )?.sellingPrice
+                            : 0) +
                             (addDecorItem.platform
                               ? addDecorItem.dimensions.length *
                               addDecorItem.dimensions.breadth *
@@ -4345,8 +4366,8 @@ export default function Event({ message, setMessage }) {
                                     <MdDone
                                       cursor={"pointer"}
                                       className={`${loading
-                                          ? `text-green-400`
-                                          : `text-green-600`
+                                        ? `text-green-400`
+                                        : `text-green-600`
                                         } font-bold text-2xl`}
                                       onClick={() => {
                                         if (!loading) {
@@ -4358,8 +4379,8 @@ export default function Event({ message, setMessage }) {
                                     <MdEdit
                                       cursor={"pointer"}
                                       className={`${loading
-                                          ? `text-blue-400`
-                                          : `text-blue-600`
+                                        ? `text-blue-400`
+                                        : `text-blue-600`
                                         } font-bold text-2xl`}
                                       onClick={() => {
                                         if (!loading) {
@@ -5077,8 +5098,8 @@ export default function Event({ message, setMessage }) {
                                     <MdOutlineImage
                                       cursor={"pointer"}
                                       className={`${loading
-                                          ? `text-gray-400`
-                                          : `text-gray-600`
+                                        ? `text-gray-400`
+                                        : `text-gray-600`
                                         } font-bold text-xl`}
                                       onClick={() => {
                                         if (
@@ -5105,8 +5126,8 @@ export default function Event({ message, setMessage }) {
                                         <MdDelete
                                           cursor={"pointer"}
                                           className={`${loading
-                                              ? `text-red-400`
-                                              : `text-red-600`
+                                            ? `text-red-400`
+                                            : `text-red-600`
                                             } font-bold text-2xl`}
                                           onClick={() => {
                                             if (!loading) {
