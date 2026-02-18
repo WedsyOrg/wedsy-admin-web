@@ -32,6 +32,7 @@ import {
   MdDelete,
   MdEdit,
   MdDone,
+  MdClose,
   MdOutlineImage,
   MdDownload,
   MdLink,
@@ -769,7 +770,7 @@ export default function Event({ message, setMessage }) {
           let tempEventDay = response?.eventDays?.find(
             (item) => item._id === eventDayId
           );
-          if (tempEventDay._id) {
+          if (tempEventDay?._id) {
             setEventDay(tempEventDay);
             setEventDayNotes(tempEventDay?.notes || "");
             setCustomItems(tempEventDay.customItems || []);
@@ -1635,34 +1636,38 @@ export default function Event({ message, setMessage }) {
       });
   };
   const RemoveDecorFromEvent = ({ decor_id }) => {
+    const url = `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/decor/${eventDayId || "0"}`;
     setLoading(true);
-    fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/decor/${eventDayId}`,
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          decor: decor_id,
-        }),
-      }
+    fetch(url, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ decorItemId: decor_id }),
+    }
     )
-      .then((response) => (response.ok ? response.json() : null))
+      .then((response) => response.ok ? response.json() : response.json().then(() => null))
       .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+        setLoading(false);
+        if (response && response.message === "success") {
           fetchEvent();
           setMessage({
             text: "Item removed from event Successfully!",
             status: "success",
             display: true,
           });
+        } else if (response) {
+          setMessage({
+            text: response.message || "Failed to remove item.",
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("RemoveDecorFromEvent error:", error);
       });
   };
   const RemovePackageFromEvent = ({ package_id }) => {
@@ -2036,7 +2041,7 @@ export default function Event({ message, setMessage }) {
       let tempEventDay = event?.eventDays?.find(
         (item) => item._id === eventDayId
       );
-      if (tempEventDay._id) {
+      if (tempEventDay?._id) {
         setEventDay(tempEventDay);
         setCustomItems(tempEventDay.customItems || []);
         setMandatoryItems(tempEventDay.mandatoryItems || []);
@@ -4323,7 +4328,7 @@ export default function Event({ message, setMessage }) {
                                           )
                                         ) {
                                           RemoveDecorFromEvent({
-                                            decor_id: item.decor._id,
+                                            decor_id: item._id,
                                           });
                                         }
                                       }
@@ -4363,18 +4368,35 @@ export default function Event({ message, setMessage }) {
                                   Inclusive of:
                                   {item.decor?._id ===
                                     editDecorIncluded.decor_id ? (
-                                    <MdDone
-                                      cursor={"pointer"}
-                                      className={`${loading
-                                        ? `text-green-400`
-                                        : `text-green-600`
-                                        } font-bold text-2xl`}
-                                      onClick={() => {
-                                        if (!loading) {
-                                          UpdateDecorIncluded();
-                                        }
-                                      }}
-                                    />
+                                    <div className="flex gap-2 items-center">
+                                      <MdDone
+                                        cursor={"pointer"}
+                                        className={`${loading
+                                            ? `text-green-400`
+                                            : `text-green-600`
+                                          } font-bold text-2xl`}
+                                        onClick={() => {
+                                          if (!loading) {
+                                            UpdateDecorIncluded();
+                                          }
+                                        }}
+                                      />
+                                      <MdClose
+                                        cursor={"pointer"}
+                                        className={`${loading
+                                            ? `text-gray-400`
+                                            : `text-gray-600`
+                                          } font-bold text-2xl`}
+                                        onClick={() => {
+                                          if (!loading) {
+                                            setEditDecorIncluded({
+                                              decor_id: "",
+                                              included: "",
+                                            });
+                                          }
+                                        }}
+                                      />
+                                    </div>
                                   ) : (
                                     <MdEdit
                                       cursor={"pointer"}
@@ -5137,7 +5159,7 @@ export default function Event({ message, setMessage }) {
                                                 )
                                               ) {
                                                 RemoveDecorFromEvent({
-                                                  decor_id: item.decor._id,
+                                                  decor_id: item._id,
                                                 });
                                               }
                                             }

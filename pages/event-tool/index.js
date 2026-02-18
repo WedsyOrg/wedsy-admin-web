@@ -75,19 +75,15 @@ export default function Event({ user }) {
   const fetchList = () => {
     setLoading(true);
     fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/event?page=${
-        page || 1
-      }&limit=${itemsPerPage}${search && `&search=${search}`}${
-        sort && `&sort=${sort}`
+      `${process.env.NEXT_PUBLIC_API_URL}/event?page=${page || 1
+      }&limit=${itemsPerPage}${search && `&search=${search}`}${sort && `&sort=${sort}`
       }${status && `&status=${status}`}
-      ${community && `&community=${community}`}${
-        eventType && `&eventType=${eventType}`
-      }${
-        dateFilter[0]
-          ? dateFilter[1]
-            ? `&startDate=${dateFilter[0]}&endDate=${dateFilter[1]}`
-            : `&eventDate=${dateFilter[0]}`
-          : ""
+      ${community && `&community=${community}`}${eventType && `&eventType=${eventType}`
+      }${dateFilter[0]
+        ? dateFilter[1]
+          ? `&startDate=${dateFilter[0]}&endDate=${dateFilter[1]}`
+          : `&eventDate=${dateFilter[0]}`
+        : ""
       }`,
       {
         method: "GET",
@@ -127,6 +123,7 @@ export default function Event({ user }) {
         fetchList();
       })
       .catch((error) => {
+        setLoading(false);
         console.error("There was a problem with the fetch operation:", error);
       });
   };
