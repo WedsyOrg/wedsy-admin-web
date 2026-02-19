@@ -562,20 +562,54 @@ export default function Event({ message, setMessage }) {
         eventNotes,
       }),
     })
-      .then((response) => response.json())
-      .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+      .then(async (response) => {
+        setLoading(false);
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          console.error("updateEventNotes: Failed to parse response", e);
+          setMessage({
+            text: "Failed to update event notes. Please try again.",
+            status: "error",
+            display: true,
+          });
+          return;
+        }
+
+        if (response.ok && responseData.message === "success") {
           fetchEvent();
           setMessage({
             text: "Event notes updated Successfully!",
             status: "success",
             display: true,
           });
+        } else {
+          const errorMessage = responseData?.message || `Failed to update event notes (${response.status})`;
+          console.error("updateEventNotes: Server error", {
+            status: response.status,
+            message: errorMessage,
+            responseData,
+          });
+          setMessage({
+            text: errorMessage,
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("updateEventNotes: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          eventId,
+        });
+        setMessage({
+          text: "Network error. Please check your connection and try again.",
+          status: "error",
+          display: true,
+        });
       });
   };
   const fetchEventLostResponses = () => {
@@ -962,10 +996,22 @@ export default function Event({ message, setMessage }) {
         }),
       }
     )
-      .then((response) => response.json())
-      .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+      .then(async (response) => {
+        setLoading(false);
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          console.error("shuffleEventDay: Failed to parse response", e);
+          setMessage({
+            text: "Failed to update event. Please try again.",
+            status: "error",
+            display: true,
+          });
+          return;
+        }
+
+        if (response.ok && responseData.message === "success") {
           fetchEvent();
           setMessage({
             text: "Event updated Successfully!",
@@ -973,12 +1019,33 @@ export default function Event({ message, setMessage }) {
             display: true,
           });
         } else {
-          alert(response.error);
-          setLoading(false);
+          const errorMessage = responseData?.error || responseData?.message || `Failed to update event (${response.status})`;
+          console.error("shuffleEventDay: Server error", {
+            status: response.status,
+            message: errorMessage,
+            responseData,
+          });
+          alert(errorMessage);
+          setMessage({
+            text: errorMessage,
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("shuffleEventDay: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          eventId,
+          tempEventDayId,
+        });
+        setMessage({
+          text: "Network error. Please check your connection and try again.",
+          status: "error",
+          display: true,
+        });
       });
   };
   const updateEventDayNotes = () => {
@@ -996,10 +1063,22 @@ export default function Event({ message, setMessage }) {
         }),
       }
     )
-      .then((response) => response.json())
-      .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+      .then(async (response) => {
+        setLoading(false);
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          console.error("updateEventDayNotes: Failed to parse response", e);
+          setMessage({
+            text: "Failed to update event day notes. Please try again.",
+            status: "error",
+            display: true,
+          });
+          return;
+        }
+
+        if (response.ok && responseData.message === "success") {
           setEventDayNotes("");
           fetchEvent();
           setMessage({
@@ -1007,10 +1086,33 @@ export default function Event({ message, setMessage }) {
             status: "success",
             display: true,
           });
+        } else {
+          const errorMessage = responseData?.message || `Failed to update event day notes (${response.status})`;
+          console.error("updateEventDayNotes: Server error", {
+            status: response.status,
+            message: errorMessage,
+            responseData,
+          });
+          setMessage({
+            text: errorMessage,
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("updateEventDayNotes: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          eventId,
+          eventDayId,
+        });
+        setMessage({
+          text: "Network error. Please check your connection and try again.",
+          status: "error",
+          display: true,
+        });
       });
   };
   const updateEventDay = () => {
@@ -1034,10 +1136,22 @@ export default function Event({ message, setMessage }) {
           }),
         }
       )
-        .then((response) => response.json())
-        .then((response) => {
-          if (response.message === "success") {
-            setLoading(false);
+        .then(async (response) => {
+          setLoading(false);
+          let responseData;
+          try {
+            responseData = await response.json();
+          } catch (e) {
+            console.error("updateEventDay: Failed to parse response", e);
+            setMessage({
+              text: "Failed to update event day. Please try again.",
+              status: "error",
+              display: true,
+            });
+            return;
+          }
+
+          if (response.ok && responseData.message === "success") {
             fetchEvent();
             setMessage({
               text: "Event day updated Successfully!",
@@ -1054,10 +1168,33 @@ export default function Event({ message, setMessage }) {
               time: "",
               eventDay: "",
             });
+          } else {
+            const errorMessage = responseData?.message || `Failed to update event day (${response.status})`;
+            console.error("updateEventDay: Server error", {
+              status: response.status,
+              message: errorMessage,
+              responseData,
+            });
+            setMessage({
+              text: errorMessage,
+              status: "error",
+              display: true,
+            });
           }
         })
         .catch((error) => {
-          console.error("There was a problem with the fetch operation:", error);
+          setLoading(false);
+          console.error("updateEventDay: Network/fetch error", {
+            error: error.message,
+            stack: error.stack,
+            eventId,
+            eventDayId: editEventDayInfo.eventDay,
+          });
+          setMessage({
+            text: "Network error. Please check your connection and try again.",
+            status: "error",
+            display: true,
+          });
         });
     }
   };
@@ -1309,20 +1446,55 @@ export default function Event({ message, setMessage }) {
           }),
         }
       )
-        .then((response) => response.json())
-        .then((response) => {
-          if (response.message === "success") {
-            setLoading(false);
+        .then(async (response) => {
+          setLoading(false);
+          let responseData;
+          try {
+            responseData = await response.json();
+          } catch (e) {
+            console.error("updateCustomItems: Failed to parse response", e);
+            setMessage({
+              text: "Failed to update custom items. Please try again.",
+              status: "error",
+              display: true,
+            });
+            return;
+          }
+
+          if (response.ok && responseData.message === "success") {
             fetchEvent();
             setMessage({
               text: "Custom Items updated Successfully!",
               status: "success",
               display: true,
             });
+          } else {
+            const errorMessage = responseData?.message || `Failed to update custom items (${response.status})`;
+            console.error("updateCustomItems: Server error", {
+              status: response.status,
+              message: errorMessage,
+              responseData,
+            });
+            setMessage({
+              text: errorMessage,
+              status: "error",
+              display: true,
+            });
           }
         })
         .catch((error) => {
-          console.error("There was a problem with the fetch operation:", error);
+          setLoading(false);
+          console.error("updateCustomItems: Network/fetch error", {
+            error: error.message,
+            stack: error.stack,
+            eventId,
+            eventDayId,
+          });
+          setMessage({
+            text: "Network error. Please check your connection and try again.",
+            status: "error",
+            display: true,
+          });
         });
     }
   };
@@ -1342,20 +1514,55 @@ export default function Event({ message, setMessage }) {
           }),
         }
       )
-        .then((response) => response.json())
-        .then((response) => {
-          if (response.message === "success") {
-            setLoading(false);
+        .then(async (response) => {
+          setLoading(false);
+          let responseData;
+          try {
+            responseData = await response.json();
+          } catch (e) {
+            console.error("updateMandatoryItems: Failed to parse response", e);
+            setMessage({
+              text: "Failed to update mandatory items. Please try again.",
+              status: "error",
+              display: true,
+            });
+            return;
+          }
+
+          if (response.ok && responseData.message === "success") {
             fetchEvent();
             setMessage({
               text: "Mandatory Items updated Successfully!",
               status: "success",
               display: true,
             });
+          } else {
+            const errorMessage = responseData?.message || `Failed to update mandatory items (${response.status})`;
+            console.error("updateMandatoryItems: Server error", {
+              status: response.status,
+              message: errorMessage,
+              responseData,
+            });
+            setMessage({
+              text: errorMessage,
+              status: "error",
+              display: true,
+            });
           }
         })
         .catch((error) => {
-          console.error("There was a problem with the fetch operation:", error);
+          setLoading(false);
+          console.error("updateMandatoryItems: Network/fetch error", {
+            error: error.message,
+            stack: error.stack,
+            eventId,
+            eventDayId,
+          });
+          setMessage({
+            text: "Network error. Please check your connection and try again.",
+            status: "error",
+            display: true,
+          });
         });
     }
   };
@@ -1449,10 +1656,26 @@ export default function Event({ message, setMessage }) {
         }),
       }
     )
-      .then((response) => (response.ok ? response.json() : null))
-      .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+      .then(async (response) => {
+        // Always set loading to false first
+        setLoading(false);
+        
+        // Parse response body
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          console.error("AddDecorItemToEvent: Failed to parse response", e);
+          setMessage({
+            text: "Failed to add item. Please try again.",
+            status: "error",
+            display: true,
+          });
+          return;
+        }
+
+        // Handle success
+        if (response.ok && responseData.message === "success") {
           try {
             if (ADD_PRODUCT_DRAFT_KEY) {
               sessionStorage.removeItem(ADD_PRODUCT_DRAFT_KEY);
@@ -1484,10 +1707,36 @@ export default function Event({ message, setMessage }) {
             status: "success",
             display: true,
           });
+        } else {
+          // Handle error response
+          const errorMessage = responseData?.message || `Failed to add item (${response.status})`;
+          console.error("AddDecorItemToEvent: Server error", {
+            status: response.status,
+            statusText: response.statusText,
+            message: errorMessage,
+            responseData,
+          });
+          setMessage({
+            text: errorMessage,
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        // Always set loading to false on network/parsing errors
+        setLoading(false);
+        console.error("AddDecorItemToEvent: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          eventId,
+          eventDayId,
+        });
+        setMessage({
+          text: "Network error. Please check your connection and try again.",
+          status: "error",
+          display: true,
+        });
       });
   };
   const UpdateDecorItemInEvent = ({
@@ -1703,83 +1952,112 @@ export default function Event({ message, setMessage }) {
   };
   const UpdateNotes = async () => {
     setLoading(true);
-    Promise.all(
-      notes?.notes?.map(async (i, index) => {
-        if (i.imageFile) {
-          const resized = await resizeImageFile(i.imageFile, {
-            maxWidth: 1600,
-            maxHeight: 1600,
-            quality: 0.82,
-          });
-          let tempImage = await uploadFile({
-            file: resized,
-            path: "event-tool/notes",
-            id: `${new Date().getTime()}-${eventId}-${notes.decor_id}-${index}`,
-          });
-          return {
-            text: i.text,
-            image: tempImage,
-          };
-        } else {
-          return {
-            text: i.text,
-            image: i.image,
-          };
-        }
-      })
-    )
-      .then((tempResult) => {
-        let tempNotes = tempResult.filter((i) => {
-          return i.image || i.text;
-        });
-        fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/eventDay/${eventDayId}/notes`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({
-              decor_id: notes.decor_id,
-              package_id: notes.package_id,
-              admin_notes: notes.admin_notes,
-              user_notes: notes.user_notes,
-              notes: tempNotes,
-            }),
+    try {
+      const tempResult = await Promise.all(
+        notes?.notes?.map(async (i, index) => {
+          if (i.imageFile) {
+            const resized = await resizeImageFile(i.imageFile, {
+              maxWidth: 1600,
+              maxHeight: 1600,
+              quality: 0.82,
+            });
+            let tempImage = await uploadFile({
+              file: resized,
+              path: "event-tool/notes",
+              id: `${new Date().getTime()}-${eventId}-${notes.decor_id}-${index}`,
+            });
+            return {
+              text: i.text,
+              image: tempImage,
+            };
+          } else {
+            return {
+              text: i.text,
+              image: i.image,
+            };
           }
-        )
-          .then((response) => (response.ok ? response.json() : null))
-          .then((response) => {
-            if (response.message === "success") {
-              setLoading(false);
-              fetchEvent();
-              setNotes({
-                open: false,
-                edit: false,
-                decor_id: "",
-                package_id: "",
-                admin_notes: "",
-                user_notes: "",
-                notes: [],
-              });
-              setMessage({
-                text: "Notes updated Successfully!",
-                status: "success",
-                display: true,
-              });
-            }
-          })
-          .catch((error) => {
-            console.error(
-              "There was a problem with the fetch operation:",
-              error
-            );
-          });
-      })
-      .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        })
+      );
+
+      let tempNotes = tempResult.filter((i) => {
+        return i.image || i.text;
       });
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/event/${eventId}/eventDay/${eventDayId}/notes`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            decor_id: notes.decor_id,
+            package_id: notes.package_id,
+            admin_notes: notes.admin_notes,
+            user_notes: notes.user_notes,
+            notes: tempNotes,
+          }),
+        }
+      );
+
+      setLoading(false);
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (e) {
+        console.error("UpdateNotes: Failed to parse response", e);
+        setMessage({
+          text: "Failed to update notes. Please try again.",
+          status: "error",
+          display: true,
+        });
+        return;
+      }
+
+      if (response.ok && responseData.message === "success") {
+        fetchEvent();
+        setNotes({
+          open: false,
+          edit: false,
+          decor_id: "",
+          package_id: "",
+          admin_notes: "",
+          user_notes: "",
+          notes: [],
+        });
+        setMessage({
+          text: "Notes updated Successfully!",
+          status: "success",
+          display: true,
+        });
+      } else {
+        const errorMessage = responseData?.message || `Failed to update notes (${response.status})`;
+        console.error("UpdateNotes: Server error", {
+          status: response.status,
+          message: errorMessage,
+          responseData,
+        });
+        setMessage({
+          text: errorMessage,
+          status: "error",
+          display: true,
+        });
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error("UpdateNotes: Upload/fetch error", {
+        error: error.message,
+        stack: error.stack,
+        eventId,
+        eventDayId,
+      });
+      setMessage({
+        text: "Failed to update notes. Please try again.",
+        status: "error",
+        display: true,
+      });
+    }
   };
   const UpdateAddOns = () => {
     setLoading(true);
@@ -1815,10 +2093,22 @@ export default function Event({ message, setMessage }) {
           }),
         }
       )
-        .then((response) => (response.ok ? response.json() : null))
-        .then((response) => {
-          if (response.message === "success") {
-            setLoading(false);
+        .then(async (response) => {
+          setLoading(false);
+          let responseData;
+          try {
+            responseData = await response.json();
+          } catch (e) {
+            console.error("UpdateAddOns: Failed to parse response", e);
+            setMessage({
+              text: "Failed to update add-ons. Please try again.",
+              status: "error",
+              display: true,
+            });
+            return;
+          }
+
+          if (response.ok && responseData.message === "success") {
             fetchEvent();
             setEditAddOns({
               open: false,
@@ -1832,10 +2122,33 @@ export default function Event({ message, setMessage }) {
               status: "success",
               display: true,
             });
+          } else {
+            const errorMessage = responseData?.message || `Failed to update add-ons (${response.status})`;
+            console.error("UpdateAddOns: Server error", {
+              status: response.status,
+              message: errorMessage,
+              responseData,
+            });
+            setMessage({
+              text: errorMessage,
+              status: "error",
+              display: true,
+            });
           }
         })
         .catch((error) => {
-          console.error("There was a problem with the fetch operation:", error);
+          setLoading(false);
+          console.error("UpdateAddOns: Network/fetch error", {
+            error: error.message,
+            stack: error.stack,
+            eventId,
+            eventDayId,
+          });
+          setMessage({
+            text: "Network error. Please check your connection and try again.",
+            status: "error",
+            display: true,
+          });
         });
     } else {
       setLoading(false);
@@ -1850,19 +2163,53 @@ export default function Event({ message, setMessage }) {
         authorization: `Bearer ${localStorage.getItem("token")}`,
       },
     })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+      .then(async (response) => {
+        setLoading(false);
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          console.error("SendEventToClient: Failed to parse response", e);
+          setMessage({
+            text: "Failed to send event. Please try again.",
+            status: "error",
+            display: true,
+          });
+          return;
+        }
+
+        if (response.ok && responseData.message === "success") {
           setMessage({
             text: "Event sent to Client Successfully!",
             status: "success",
             display: true,
           });
+        } else {
+          const errorMessage = responseData?.message || `Failed to send event (${response.status})`;
+          console.error("SendEventToClient: Server error", {
+            status: response.status,
+            message: errorMessage,
+            responseData,
+          });
+          setMessage({
+            text: errorMessage,
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("SendEventToClient: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          eventId,
+        });
+        setMessage({
+          text: "Network error. Please check your connection and try again.",
+          status: "error",
+          display: true,
+        });
       });
   };
   const SendEventBookingReminder = () => {
@@ -1877,86 +2224,162 @@ export default function Event({ message, setMessage }) {
         },
       }
     )
-      .then((response) => (response.ok ? response.json() : null))
-      .then((response) => {
-        if (response.message === "success") {
-          setLoading(false);
+      .then(async (response) => {
+        setLoading(false);
+        let responseData;
+        try {
+          responseData = await response.json();
+        } catch (e) {
+          console.error("SendEventBookingReminder: Failed to parse response", e);
+          setMessage({
+            text: "Failed to send booking reminder. Please try again.",
+            status: "error",
+            display: true,
+          });
+          return;
+        }
+
+        if (response.ok && responseData.message === "success") {
           setMessage({
             text: "Event Booking Reminder Sent Successfully!",
             status: "success",
             display: true,
           });
+        } else {
+          const errorMessage = responseData?.message || `Failed to send booking reminder (${response.status})`;
+          console.error("SendEventBookingReminder: Server error", {
+            status: response.status,
+            message: errorMessage,
+            responseData,
+          });
+          setMessage({
+            text: errorMessage,
+            status: "error",
+            display: true,
+          });
         }
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("SendEventBookingReminder: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          eventId,
+        });
+        setMessage({
+          text: "Network error. Please check your connection and try again.",
+          status: "error",
+          display: true,
+        });
       });
   };
   const UploadCustomImage = async () => {
     setLoading(true);
-    let tempImage = await uploadFile({
-      file: customItemImageUpload.imageFile,
-      path: "event-tool/custom-items",
-      id: `${new Date().getTime()}-${eventId}-${customItems[
-        customItemImageUpload.itemIndex
-      ].name
-        .substring(0, 10)
-        .replace(/[^a-zA-Z0-9]/g, "-")}`,
-    });
-    if (tempImage) {
-      setCustomItems(
-        customItems.map((item, index) => {
-          if (index === customItemImageUpload.itemIndex) {
-            return { ...item, image: tempImage };
-          } else {
-            return item;
-          }
-        })
-      );
-      setLoading(false);
-      setMessage({
-        text: "Image Uploaded Successfully!",
-        status: "success",
-        display: true,
+    try {
+      let tempImage = await uploadFile({
+        file: customItemImageUpload.imageFile,
+        path: "event-tool/custom-items",
+        id: `${new Date().getTime()}-${eventId}-${customItems[
+          customItemImageUpload.itemIndex
+        ].name
+          .substring(0, 10)
+          .replace(/[^a-zA-Z0-9]/g, "-")}`,
       });
-      setCustomItemImageUpload({
-        display: false,
-        itemIndex: -1,
-        imageFile: "",
+      if (tempImage) {
+        setCustomItems(
+          customItems.map((item, index) => {
+            if (index === customItemImageUpload.itemIndex) {
+              return { ...item, image: tempImage };
+            } else {
+              return item;
+            }
+          })
+        );
+        setLoading(false);
+        setMessage({
+          text: "Image Uploaded Successfully!",
+          status: "success",
+          display: true,
+        });
+        setCustomItemImageUpload({
+          display: false,
+          itemIndex: -1,
+          imageFile: "",
+        });
+      } else {
+        setLoading(false);
+        setMessage({
+          text: "Failed to upload image. Please try again.",
+          status: "error",
+          display: true,
+        });
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error("UploadCustomImage: Upload error", {
+        error: error.message,
+        stack: error.stack,
+        eventId,
+      });
+      setMessage({
+        text: "Failed to upload image. Please try again.",
+        status: "error",
+        display: true,
       });
     }
   };
   const UploadCustomSetupLocationImage = async () => {
     setLoading(true);
-    let tempImage = await uploadFile({
-      file: customItemSetupLocationImageUpload.imageFile,
-      path: "event-tool/setup-location-image",
-      id: `${new Date().getTime()}-${eventId}-${customItems[
-        customItemSetupLocationImageUpload.itemIndex
-      ].name
-        .substring(0, 10)
-        .replace(/[^a-zA-Z0-9]/g, "-")}`,
-    });
-    if (tempImage) {
-      setCustomItems(
-        customItems.map((item, index) => {
-          if (index === customItemSetupLocationImageUpload.itemIndex) {
-            return { ...item, setupLocationImage: tempImage };
-          } else {
-            return item;
-          }
-        })
-      );
-      setLoading(false);
-      setMessage({
-        text: "Image Uploaded Successfully!",
-        status: "success",
-        display: true,
+    try {
+      let tempImage = await uploadFile({
+        file: customItemSetupLocationImageUpload.imageFile,
+        path: "event-tool/setup-location-image",
+        id: `${new Date().getTime()}-${eventId}-${customItems[
+          customItemSetupLocationImageUpload.itemIndex
+        ].name
+          .substring(0, 10)
+          .replace(/[^a-zA-Z0-9]/g, "-")}`,
       });
-      setCustomItemSetupLocationImageUpload({
-        display: false,
-        itemIndex: -1,
-        imageFile: "",
+      if (tempImage) {
+        setCustomItems(
+          customItems.map((item, index) => {
+            if (index === customItemSetupLocationImageUpload.itemIndex) {
+              return { ...item, setupLocationImage: tempImage };
+            } else {
+              return item;
+            }
+          })
+        );
+        setLoading(false);
+        setMessage({
+          text: "Image Uploaded Successfully!",
+          status: "success",
+          display: true,
+        });
+        setCustomItemSetupLocationImageUpload({
+          display: false,
+          itemIndex: -1,
+          imageFile: "",
+        });
+      } else {
+        setLoading(false);
+        setMessage({
+          text: "Failed to upload image. Please try again.",
+          status: "error",
+          display: true,
+        });
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error("UploadCustomSetupLocationImage: Upload error", {
+        error: error.message,
+        stack: error.stack,
+        eventId,
+      });
+      setMessage({
+        text: "Failed to upload image. Please try again.",
+        status: "error",
+        display: true,
       });
     }
   };

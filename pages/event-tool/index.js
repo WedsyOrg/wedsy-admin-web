@@ -51,7 +51,11 @@ export default function Event({ user }) {
         setCommunityList(response);
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("fetchEventCommunityList: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+        });
       });
   };
   const fetchEventTypeList = () => {
@@ -69,7 +73,11 @@ export default function Event({ user }) {
         setEventTypeList(response);
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("fetchEventTypeList: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+        });
       });
   };
   const fetchList = () => {
@@ -101,7 +109,13 @@ export default function Event({ user }) {
         setSelected([]);
       })
       .catch((error) => {
-        console.error("There was a problem with the fetch operation:", error);
+        setLoading(false);
+        console.error("fetchList: Network/fetch error", {
+          error: error.message,
+          stack: error.stack,
+          page,
+          itemsPerPage,
+        });
       });
   };
   const deleteEvents = () => {
