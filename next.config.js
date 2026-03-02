@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    unoptimized: true,
     domains: [
       "wedsy.s3.amazonaws.com",
       "wedsy.s3.ap-south-1.amazonaws.com",
@@ -13,4 +12,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-
