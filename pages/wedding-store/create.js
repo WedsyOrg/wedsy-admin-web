@@ -63,6 +63,14 @@ const initalValues = {
   productTypes: [],
   productVariants: [],
   productAddOns: [],
+  productVariation: {
+    occassion: [],
+    colors: [],
+    style: "",
+    flowers: [],
+    fabric: [],
+    nameboardMaterial: [],
+  },
 };
 
 export default function Decor({}) {
@@ -79,6 +87,7 @@ export default function Decor({}) {
     display: false,
   });
   const [lastProductId, setLastProductId] = useState(null);
+  const [variationOptions, setVariationOptions] = useState({ occassion: [], colors: [], flowers: [], fabric: [] });
   const imageRef = useRef();
   const thumbnailRef = useRef();
   const videoRef = useRef();
@@ -348,6 +357,28 @@ export default function Decor({}) {
         );
         let tempProductAddOns = data.productAddOns.map((i) => i._id);
 
+        const attrToVariation = { Occasion: "occassion", Colors: "colors", Flowers: "flowers", Fabric: "fabric" };
+        const syncedVariation = {
+          occassion: [...(data.productVariation?.occassion || [])],
+          colors: [...(data.productVariation?.colors || [])],
+          style: data.productVariation?.style || "",
+          flowers: [...(data.productVariation?.flowers || [])],
+          fabric: [...(data.productVariation?.fabric || [])],
+          nameboardMaterial: [...(data.productVariation?.nameboardMaterial || [])],
+        };
+        data.attributes.forEach((attr) => {
+          const key = attrToVariation[attr.name];
+          if (key) {
+            const existing = new Set(syncedVariation[key].map((v) => v.toLowerCase()));
+            attr.list.forEach((v) => {
+              if (v && !existing.has(v.toLowerCase())) {
+                syncedVariation[key].push(v);
+                existing.add(v.toLowerCase());
+              }
+            });
+          }
+        });
+
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/decor`, {
           method: "POST",
           headers: {
@@ -392,6 +423,7 @@ export default function Decor({}) {
             rawMaterials: data.rawMaterials,
             productTypes: tempproductTypes,
             productVariants: tempproductVariants,
+            productVariation: syncedVariation,
             productAddOns: tempProductAddOns,
           }),
         })
@@ -425,6 +457,21 @@ export default function Decor({}) {
     fetchLabels();
     fetchAttributes();
     fetchRawMaterials();
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/attribute/public`)
+      .then((r) => r.json())
+      .then((attrs) => {
+        const toList = (name) =>
+          (attrs.find((a) => a.name === name)?.list || []).map(
+            (v) => v.charAt(0).toUpperCase() + v.slice(1).toLowerCase()
+          );
+        setVariationOptions({
+          occassion: toList("Occasion"),
+          colors: toList("Colors"),
+          flowers: toList("Flowers"),
+          fabric: toList("Fabric"),
+        });
+      })
+      .catch(() => {});
   }, []);
   useEffect(() => {
     if (addProductAddOns.productId) {
@@ -1065,6 +1112,159 @@ export default function Decor({}) {
                 </div>
               </div>
             ))}
+          </div>
+          {/* Product Variation */}
+          <p className="font-semibold text-xl">Product Variation</p>
+          <div className="pb-2 border-b-4 flex flex-col gap-6">
+            {/* Occasion */}
+            {variationOptions.occassion.length > 0 && (
+              <div>
+                <div className="mb-2 block">
+                  <Label value="Occasion" />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {variationOptions.occassion.map((o) => (
+                    <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={data.productVariation.occassion.map((v) => v.toLowerCase()).includes(o.toLowerCase())}
+                        onChange={() => {
+                          const current = data.productVariation.occassion;
+                          setData({
+                            ...data,
+                            productVariation: {
+                              ...data.productVariation,
+                              occassion: current.map((v) => v.toLowerCase()).includes(o.toLowerCase())
+                                ? current.filter((v) => v.toLowerCase() !== o.toLowerCase())
+                                : [...current, o],
+                            },
+                          });
+                        }}
+                      />
+                      <span className="text-sm">{o}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Colors */}
+            {variationOptions.colors.length > 0 && (
+              <div>
+                <div className="mb-2 block">
+                  <Label value="Colors" />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {variationOptions.colors.map((o) => (
+                    <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={data.productVariation.colors.map((v) => v.toLowerCase()).includes(o.toLowerCase())}
+                        onChange={() => {
+                          const current = data.productVariation.colors;
+                          setData({
+                            ...data,
+                            productVariation: {
+                              ...data.productVariation,
+                              colors: current.map((v) => v.toLowerCase()).includes(o.toLowerCase())
+                                ? current.filter((v) => v.toLowerCase() !== o.toLowerCase())
+                                : [...current, o],
+                            },
+                          });
+                        }}
+                      />
+                      <span className="text-sm">{o}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Flowers */}
+            {variationOptions.flowers.length > 0 && (
+              <div>
+                <div className="mb-2 block">
+                  <Label value="Flowers" />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {variationOptions.flowers.map((o) => (
+                    <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={data.productVariation.flowers.map((v) => v.toLowerCase()).includes(o.toLowerCase())}
+                        onChange={() => {
+                          const current = data.productVariation.flowers;
+                          setData({
+                            ...data,
+                            productVariation: {
+                              ...data.productVariation,
+                              flowers: current.map((v) => v.toLowerCase()).includes(o.toLowerCase())
+                                ? current.filter((v) => v.toLowerCase() !== o.toLowerCase())
+                                : [...current, o],
+                            },
+                          });
+                        }}
+                      />
+                      <span className="text-sm">{o}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Fabric */}
+            {variationOptions.fabric.length > 0 && (
+              <div>
+                <div className="mb-2 block">
+                  <Label value="Fabric" />
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {variationOptions.fabric.map((o) => (
+                    <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 cursor-pointer"
+                        checked={data.productVariation.fabric.map((v) => v.toLowerCase()).includes(o.toLowerCase())}
+                        onChange={() => {
+                          const current = data.productVariation.fabric;
+                          setData({
+                            ...data,
+                            productVariation: {
+                              ...data.productVariation,
+                              fabric: current.map((v) => v.toLowerCase()).includes(o.toLowerCase())
+                                ? current.filter((v) => v.toLowerCase() !== o.toLowerCase())
+                                : [...current, o],
+                            },
+                          });
+                        }}
+                      />
+                      <span className="text-sm">{o}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Style */}
+            <div>
+              <div className="mb-2 block">
+                <Label value="Style" />
+              </div>
+              <div className="flex gap-2">
+                {[{ label: "None", value: "" }, { label: "Modern", value: "Modern" }, { label: "Traditional", value: "Traditional" }].map((s) => (
+                  <Button
+                    key={s.value || "none"}
+                    type="button"
+                    color={data.productVariation.style === s.value ? "blue" : "light"}
+                    onClick={() =>
+                      setData({ ...data, productVariation: { ...data.productVariation, style: s.value } })
+                    }
+                    disabled={loading}
+                  >
+                    {s.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
           <p className="font-semibold text-xl">Quantity</p>
           <div className="pb-2 border-b-4 grid grid-cols-5 gap-4 items-center">
