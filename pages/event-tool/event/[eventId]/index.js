@@ -1568,6 +1568,26 @@ export default function Event({ message, setMessage }) {
   };
   const fetchDecorList = () => {
     setLoading(true);
+    const syntheticItems = {
+      fp01: {
+        _id: "platform", name: "Platform",
+        productInfo: { id: "fp01", included: [] },
+        category: "Furniture", unit: "sq.ft",
+        productTypes: [{ name: "sq.ft", sellingPrice: 0 }],
+      },
+      fp02: {
+        _id: "flooring", name: "Flooring",
+        productInfo: { id: "fp02", included: [] },
+        category: "Furniture", unit: "sq.ft",
+        productTypes: [{ name: "sq.ft", sellingPrice: 0 }],
+      },
+    };
+    const synthetic = syntheticItems[addDecorItem?.productId];
+    if (synthetic) {
+      setLoading(false);
+      setAddDecorItem({ ...addDecorItem, decorList: [synthetic], decor: "", decorItem: "", flooringRate: 0, platformRate: 0, decorPrice: 0 });
+      return;
+    }
     fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/decor?searchFor=decorId&decorId=${addDecorItem?.productId}&limit=5`,
       {
