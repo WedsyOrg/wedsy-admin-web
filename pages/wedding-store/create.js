@@ -933,7 +933,7 @@ export default function Decor({}) {
               <FileInput
                 ref={imageRef}
                 disabled={loading}
-                accept="image/*,.heic,.HEIC"
+                accept="image/*,.heic,.HEIC,.heif,.HEIF,.webp,.avif"
                 onChange={(e) => {
                   const file = e.target.files[0];
                   // Mirror the main image into the thumbnail field — the
@@ -995,7 +995,7 @@ export default function Decor({}) {
             <input
               type="file"
               multiple
-              accept="image/*,.heic,.HEIC"
+              accept="image/*,.heic,.HEIC,.heif,.HEIF,.webp,.avif"
               disabled={loading}
               className="block w-full text-sm border border-gray-300 rounded-lg cursor-pointer bg-gray-50 file:bg-gray-200 file:border-0 file:px-4 file:py-2 file:mr-3 file:font-medium"
               onChange={(e) => {
@@ -1698,7 +1698,7 @@ export default function Decor({}) {
                 />
                 <FileInput
                   disabled={loading}
-                  accept="image/*,.heic,.HEIC"
+                  accept="image/*,.heic,.HEIC,.heif,.HEIF,.webp,.avif"
                   onChange={(e) => {
                     setData({
                       ...data,
