@@ -301,10 +301,52 @@ export default function Decor({}) {
       }
       const styleStr =
         Array.isArray(ai.style) && ai.style.length > 0 ? ai.style[0] : "";
+
+      // Auto-increment Decor ID from the last product in this category.
+      let nextDecorId = "";
+      try {
+        const lastRes = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/decor?getLastIdFor=${encodeURIComponent(
+            data.category
+          )}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+          }
+        );
+        const lastData = await lastRes.json().catch(() => ({}));
+        const lastId = lastData?.id || "";
+        const m = lastId.match(/^([a-zA-Z]+)(\d+)$/);
+        if (m) {
+          const prefix = m[1];
+          const num = parseInt(m[2], 10);
+          const padLength = m[2].length;
+          nextDecorId = prefix + String(num + 1).padStart(padLength, "0");
+        }
+      } catch (e) {
+        console.warn("Could not auto-increment decor ID:", e);
+      }
+
+      const includedArr =
+        Array.isArray(ai.included) && ai.included.length > 0
+          ? ai.included
+          : [""];
+
       setData((prev) => ({
         ...prev,
         name: ai.name || prev.name,
         description: ai.description || prev.description,
+        productVisibility: true,
+        productAvailability: true,
+        thumbnailFile: prev.imageFile || prev.thumbnailFile,
+        productInfo: {
+          ...prev.productInfo,
+          id: nextDecorId || prev.productInfo.id,
+          included: includedArr,
+        },
         productVariation: {
           ...prev.productVariation,
           occassion: Array.isArray(ai.occasions) ? ai.occasions : [],
@@ -867,7 +909,11 @@ export default function Decor({}) {
                 ref={imageRef}
                 disabled={loading}
                 onChange={(e) => {
-                  setData({ ...data, imageFile: e.target.files[0] });
+                  const file = e.target.files[0];
+                  // Mirror the main image into the thumbnail field so it shows
+                  // in both previews; user can still override via the
+                  // Thumbnail FileInput.
+                  setData({ ...data, imageFile: file, thumbnailFile: file });
                   setAiPhaseComplete(false);
                   setAiBanner("");
                 }}
