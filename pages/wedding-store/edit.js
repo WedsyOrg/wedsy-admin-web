@@ -206,7 +206,15 @@ export default function Decor({}) {
     });
 
   const runAiAnalyze = async () => {
-    if (!data.imageFile) {
+    console.log("API URL:", process.env.NEXT_PUBLIC_API_URL);
+    console.log("Image file:", data.imageFile);
+    console.log("Category:", data.category);
+
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      alert("API URL not configured. Please check environment variables.");
+      return;
+    }
+    if (!data.imageFile || !(data.imageFile instanceof File)) {
       alert("Please upload an image first");
       return;
     }
@@ -229,9 +237,11 @@ export default function Decor({}) {
           body: JSON.stringify({ imageBase64, category: data.category }),
         }
       );
-      const ai = await res.json();
+      const ai = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(ai?.message || "AI analyze failed");
+        const serverMsg = ai?.message || `AI analyze failed (HTTP ${res.status})`;
+        const detail = ai?.error && ai.error !== ai?.message ? ` — ${ai.error}` : "";
+        throw new Error(`${serverMsg}${detail}`);
       }
       const styleStr =
         Array.isArray(ai.style) && ai.style.length > 0 ? ai.style[0] : "";
@@ -252,7 +262,14 @@ export default function Decor({}) {
         "AI filled all fields — review, adjust if needed, then enter price"
       );
     } catch (err) {
-      alert(`AI autofill failed: ${err.message || err}`);
+      console.error("AI autofill error:", err);
+      alert(
+        "AI autofill failed: " +
+          (err?.response?.data?.message ||
+            err?.message ||
+            JSON.stringify(err) ||
+            "Unknown error")
+      );
     } finally {
       setIsAnalyzing(false);
     }
@@ -282,8 +299,12 @@ export default function Decor({}) {
           body: JSON.stringify({ currentAttributes }),
         }
       );
-      const ai = await res.json();
-      if (!res.ok) throw new Error(ai?.message || "AI regenerate failed");
+      const ai = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const serverMsg = ai?.message || `AI regenerate failed (HTTP ${res.status})`;
+        const detail = ai?.error && ai.error !== ai?.message ? ` — ${ai.error}` : "";
+        throw new Error(`${serverMsg}${detail}`);
+      }
       setData((prev) => ({
         ...prev,
         name: ai.name || prev.name,
