@@ -88,6 +88,12 @@ export default function Decor({}) {
   });
   const [lastProductId, setLastProductId] = useState(null);
   const [variationOptions, setVariationOptions] = useState({ occassion: [], colors: [], flowers: [], fabric: [] });
+  // AI listing state
+  const [aiPhaseComplete, setAiPhaseComplete] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [aiBanner, setAiBanner] = useState("");
+  const [aiToast, setAiToast] = useState("");
   const imageRef = useRef();
   const thumbnailRef = useRef();
   const videoRef = useRef();
@@ -246,6 +252,108 @@ export default function Decor({}) {
       }
     });
   };
+  // ─── AI Autofill ──────────────────────────────────────────────────────────
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const runAiAnalyze = async () => {
+    if (!data.imageFile) {
+      alert("Please upload an image first");
+      return;
+    }
+    if (!data.category) {
+      alert("Please pick a category first");
+      return;
+    }
+    setIsAnalyzing(true);
+    setAiBanner("");
+    try {
+      const imageBase64 = await fileToBase64(data.imageFile);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/decor/ai-analyze`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ imageBase64, category: data.category }),
+        }
+      );
+      const ai = await res.json();
+      if (!res.ok) {
+        throw new Error(ai?.message || "AI analyze failed");
+      }
+      const styleStr =
+        Array.isArray(ai.style) && ai.style.length > 0 ? ai.style[0] : "";
+      setData((prev) => ({
+        ...prev,
+        name: ai.name || prev.name,
+        description: ai.description || prev.description,
+        productVariation: {
+          ...prev.productVariation,
+          occassion: Array.isArray(ai.occasions) ? ai.occasions : [],
+          colors: Array.isArray(ai.colors) ? ai.colors : [],
+          flowers: Array.isArray(ai.flowers) ? ai.flowers : [],
+          style: styleStr || prev.productVariation.style,
+        },
+      }));
+      setAiPhaseComplete(true);
+      setAiBanner(
+        "AI filled all fields — review, adjust if needed, then enter price"
+      );
+    } catch (err) {
+      alert(`AI autofill failed: ${err.message || err}`);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const runAiRegenerate = async () => {
+    setIsRegenerating(true);
+    setAiToast("");
+    try {
+      const currentAttributes = {
+        category: data.category,
+        style: data.productVariation.style
+          ? [data.productVariation.style]
+          : [],
+        colors: data.productVariation.colors,
+        flowers: data.productVariation.flowers,
+        occasions: data.productVariation.occassion,
+      };
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/decor/ai-regenerate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({ currentAttributes }),
+        }
+      );
+      const ai = await res.json();
+      if (!res.ok) throw new Error(ai?.message || "AI regenerate failed");
+      setData((prev) => ({
+        ...prev,
+        name: ai.name || prev.name,
+        description: ai.description || prev.description,
+      }));
+      setAiToast("Name and description updated");
+      setTimeout(() => setAiToast(""), 3000);
+    } catch (err) {
+      alert(`Regenerate failed: ${err.message || err}`);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -719,17 +827,58 @@ export default function Decor({}) {
               </Button>
             </div>
           </div>
+          {/* AI status banners */}
+          {aiBanner && (
+            <div className="rounded-md bg-green-50 border border-green-200 text-green-800 px-4 py-2 text-sm">
+              {aiBanner}
+            </div>
+          )}
+          {aiToast && (
+            <div className="rounded-md bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 text-sm">
+              {aiToast}
+            </div>
+          )}
           {/* Uploads */}
           <div className="grid grid-cols-4 gap-4 items-center">
-            <div>
+            <div className="flex flex-col gap-2">
               <Label value="Image" />
               <FileInput
                 ref={imageRef}
                 disabled={loading}
                 onChange={(e) => {
                   setData({ ...data, imageFile: e.target.files[0] });
+                  setAiPhaseComplete(false);
+                  setAiBanner("");
                 }}
               />
+              <button
+                type="button"
+                onClick={runAiAnalyze}
+                disabled={loading || isAnalyzing || !data.imageFile}
+                className={`text-sm font-medium px-3 py-2 rounded border transition-colors ${
+                  aiPhaseComplete
+                    ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200"
+                    : "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
+                } disabled:opacity-50`}
+              >
+                {isAnalyzing
+                  ? "Analysing image..."
+                  : aiPhaseComplete
+                  ? "✦ AI filled ✓"
+                  : "✦ AI autofill"}
+              </button>
+              {aiPhaseComplete && (
+                <button
+                  type="button"
+                  onClick={runAiRegenerate}
+                  disabled={loading || isRegenerating}
+                  className="text-sm font-medium px-3 py-2 rounded border bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 disabled:opacity-50"
+                >
+                  {isRegenerating
+                    ? "Regenerating..."
+                    : "↻ Regenerate name & description"}
+                </button>
+              )}
             </div>
             <div>
               <Label value="Thumbnail" />
