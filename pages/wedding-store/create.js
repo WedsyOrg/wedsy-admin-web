@@ -1142,125 +1142,13 @@ export default function Decor({}) {
               />
             </div>
           </div>
-          <p className="font-semibold text-xl">Attributes</p>
           {/* Attributes */}
-          <div className="pb-2 border-b-4 ">
-            {data.attributes?.map((item, index) => (
-              <div className="" key={index}>
-                <div className="mb-2 block">
-                  <Label value={item.name} />
-                </div>
-                <div className="grid grid-cols-4 gap-4">
-                  {item.list.map((rec, recIndex) => (
-                    <div className="flex gap-2 items-center" key={recIndex}>
-                      <TextInput
-                        placeholder={item.name}
-                        name={item.name}
-                        value={rec}
-                        onChange={(e) => {
-                          setData({
-                            ...data,
-                            attributes: data.attributes.map((attr, attrIndex) =>
-                              attr.name === item.name
-                                ? {
-                                    ...attr,
-                                    list: attr.list.map(
-                                      (attrList, attrListIndex) =>
-                                        recIndex === attrListIndex
-                                          ? e.target.value
-                                          : attrList
-                                    ),
-                                  }
-                                : attr
-                            ),
-                          });
-                        }}
-                        disabled={loading}
-                        required
-                      />
-                      <MdDelete
-                        size={24}
-                        className="hover:text-red-500"
-                        cursor={"pointer"}
-                        onClick={() => {
-                          setData({
-                            ...data,
-                            attributes: data.attributes.map((attr, attrIndex) =>
-                              attr.name === item.name
-                                ? {
-                                    ...attr,
-                                    list: attr.list.filter(
-                                      (attrList, attrListIndex) =>
-                                        recIndex != attrListIndex
-                                    ),
-                                  }
-                                : attr
-                            ),
-                          });
-                        }}
-                      />
-                    </div>
-                  ))}
-                  <Select
-                    name={item.name}
-                    value={""}
-                    onChange={(e) => {
-                      setData({
-                        ...data,
-                        attributes: data.attributes.map((attr, attrIndex) =>
-                          attr.name === item.name
-                            ? {
-                                ...attr,
-                                list: [...attr.list, e.target.value],
-                              }
-                            : attr
-                        ),
-                      });
-                    }}
-                    disabled={loading}
-                  >
-                    <option value={""}>Select {item.name}</option>
-                    {attributeList
-                      ?.find((i) => i.name === item.name)
-                      ?.list?.filter((i) => !item.list.includes(i))
-                      .map((i, index) => (
-                        <option value={i} key={i}>
-                          {i}
-                        </option>
-                      ))}
-                  </Select>
-                  <Button
-                    color="light"
-                    onClick={() => {
-                      setData({
-                        ...data,
-                        attributes: data.attributes.map((attr, attrIndex) =>
-                          attr.name === item.name
-                            ? {
-                                ...attr,
-                                list: [...attr.list, ""],
-                              }
-                            : attr
-                        ),
-                      });
-                    }}
-                  >
-                    <BsPlus />
-                    Add New
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-          {/* Product Variation */}
           <p className="font-semibold text-xl">Attributes</p>
           <div className="pb-2 border-b-4 flex flex-col gap-6">
             {/* Occasion */}
             {variationOptions.occassion.length > 0 && (
               <div>
-                <div className="mb-2 block">
-                  <Label value="Occasion" />
-                </div>
+                <p className="text-lg font-semibold mb-2">Occasion</p>
                 <div className="grid grid-cols-4 gap-2">
                   {variationOptions.occassion.map((o) => (
                     <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
@@ -1290,9 +1178,7 @@ export default function Decor({}) {
             {/* Colors */}
             {variationOptions.colors.length > 0 && (
               <div>
-                <div className="mb-2 block">
-                  <Label value="Colors" />
-                </div>
+                <p className="text-lg font-semibold mb-2">Colors</p>
                 <div className="grid grid-cols-4 gap-2">
                   {variationOptions.colors.map((o) => (
                     <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
@@ -1322,9 +1208,7 @@ export default function Decor({}) {
             {/* Flowers */}
             {variationOptions.flowers.length > 0 && (
               <div>
-                <div className="mb-2 block">
-                  <Label value="Flowers" />
-                </div>
+                <p className="text-lg font-semibold mb-2">Flowers</p>
                 <div className="grid grid-cols-4 gap-2">
                   {variationOptions.flowers.map((o) => (
                     <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
@@ -1354,9 +1238,7 @@ export default function Decor({}) {
             {/* Fabric */}
             {variationOptions.fabric.length > 0 && (
               <div>
-                <div className="mb-2 block">
-                  <Label value="Fabric" />
-                </div>
+                <p className="text-lg font-semibold mb-2">Fabric</p>
                 <div className="grid grid-cols-4 gap-2">
                   {variationOptions.fabric.map((o) => (
                     <label key={o} className="flex items-center gap-2 cursor-pointer select-none">
@@ -1385,9 +1267,7 @@ export default function Decor({}) {
             )}
             {/* Style */}
             <div>
-              <div className="mb-2 block">
-                <Label value="Style" />
-              </div>
+              <p className="text-lg font-semibold mb-2">Style</p>
               <div className="flex gap-2">
                 {[{ label: "None", value: "" }, { label: "Modern", value: "Modern" }, { label: "Traditional", value: "Traditional" }].map((s) => (
                   <Button
