@@ -908,17 +908,23 @@ export default function Decor({}) {
             </div>
           )}
           {/* Uploads */}
-          <div className="grid grid-cols-4 gap-4 items-center">
+          <div className="grid grid-cols-2 gap-4 items-start">
             <div className="flex flex-col gap-2">
               <Label value="Image" />
+              {data.imageFile && (
+                <img
+                  src={URL.createObjectURL(data.imageFile)}
+                  alt="Preview"
+                  className="max-h-20 w-full object-contain rounded-lg border"
+                />
+              )}
               <FileInput
                 ref={imageRef}
                 disabled={loading}
                 onChange={(e) => {
                   const file = e.target.files[0];
-                  // Mirror the main image into the thumbnail field so it shows
-                  // in both previews; user can still override via the
-                  // Thumbnail FileInput.
+                  // Mirror the main image into the thumbnail field — the
+                  // Thumbnail FileInput has been removed from the UI.
                   setData({ ...data, imageFile: file, thumbnailFile: file });
                   setAiPhaseComplete(false);
                   setAiBanner("");
@@ -954,16 +960,6 @@ export default function Decor({}) {
               )}
             </div>
             <div>
-              <Label value="Thumbnail" />
-              <FileInput
-                ref={thumbnailRef}
-                disabled={loading}
-                onChange={(e) => {
-                  setData({ ...data, thumbnailFile: e.target.files[0] });
-                }}
-              />
-            </div>
-            <div>
               <Label value="Video" />
               <FileInput
                 ref={videoRef}
@@ -973,126 +969,69 @@ export default function Decor({}) {
                 }}
               />
             </div>
-            <div>
-              <Label value="PDF" />
-              <FileInput
-                ref={pdfRef}
-                disabled={loading}
-                onChange={(e) => {
-                  setData({ ...data, pdfFile: e.target.files[0] });
-                }}
-              />
-            </div>
           </div>
           {/* Additional Images */}
           <div className="pb-2 border-b-4">
             <div className="mb-2 block">
               <Label value="Additional Images" />
             </div>
-            <div className="grid grid-cols-4 gap-4">
-              {data.additionalImagesFile.map((item, index) => (
-                <div className="flex gap-2 items-center" key={index}>
-                  <FileInput
-                    disabled={loading}
-                    onChange={(e) => {
-                      setData({
-                        ...data,
-                        additionalImagesFile: data.additionalImagesFile.map(
-                          (rec, recIndex) =>
-                            recIndex === index ? e.target.files[0] : rec
-                        ),
-                      });
-                    }}
-                  />
-                  <MdDelete
-                    size={24}
-                    className="hover:text-red-500"
-                    cursor={"pointer"}
-                    onClick={() => {
-                      setData({
-                        ...data,
-                        additionalImagesFile: data.additionalImagesFile.filter(
-                          (rec, recIndex) => recIndex != index
-                        ),
-                      });
-                    }}
-                  />
-                </div>
-              ))}
-              <Button
-                color="light"
-                onClick={() => {
-                  setData({
-                    ...data,
-                    additionalImagesFile: [...data.additionalImagesFile, null],
-                  });
-                }}
-              >
-                <BsPlus />
-                Add New
-              </Button>
-            </div>
-          </div>
-          {/* Meta */}
-          <p className="font-semibold text-xl">Meta</p>
-          <div className="pb-2 border-b-4 grid grid-cols-3 gap-4">
-            {/* Seo Title */}
-            <div>
-              <div className="mb-2 block">
-                <Label value="Seo Title" />
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              disabled={loading}
+              className="block w-full text-sm border border-gray-300 rounded-lg cursor-pointer bg-gray-50 file:bg-gray-200 file:border-0 file:px-4 file:py-2 file:mr-3 file:font-medium"
+              onChange={(e) => {
+                const newFiles = Array.from(e.target.files || []).filter(Boolean);
+                if (newFiles.length === 0) return;
+                setData({
+                  ...data,
+                  additionalImagesFile: [
+                    ...(data.additionalImagesFile || []).filter(Boolean),
+                    ...newFiles,
+                  ],
+                });
+                e.target.value = "";
+              }}
+            />
+            {data.additionalImagesFile?.filter(Boolean).length > 0 && (
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                {data.additionalImagesFile
+                  .map((file, originalIndex) => ({ file, originalIndex }))
+                  .filter(({ file }) => file)
+                  .map(({ file, originalIndex }) => (
+                    <div
+                      key={originalIndex}
+                      className="relative border rounded p-1"
+                    >
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Additional ${originalIndex + 1}`}
+                        className="max-h-20 w-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                        onClick={() => {
+                          setData({
+                            ...data,
+                            additionalImagesFile:
+                              data.additionalImagesFile.filter(
+                                (_, i) => i !== originalIndex
+                              ),
+                          });
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
               </div>
-              <TextInput
-                placeholder="Seo Title"
-                name="seo-title"
-                value={data.seoTags.title}
-                onChange={(e) => {
-                  setData({
-                    ...data,
-                    seoTags: {
-                      ...data.seoTags,
-                      title: e.target.value,
-                    },
-                  });
-                }}
-                disabled={loading}
-              />
-            </div>
-            {/* Seo Description */}
-            <div className="col-span-2 row-span-2 place-self-start w-full">
-              <div className="mb-2 block">
-                <Label value="Seo Description" />
-              </div>
-              <Textarea
-                rows={4}
-                placeholder="Decor Description for SEO"
-                name="seo-description"
-                value={data.seoTags.description}
-                onChange={(e) => {
-                  setData({
-                    ...data,
-                    seoTags: { ...data.seoTags, description: e.target.value },
-                  });
-                }}
-                disabled={loading}
-              />
-            </div>
-            {/* Seo Image */}
-            <div>
-              <div className="mb-2 block">
-                <Label value="SEO Image" />
-              </div>
-              <FileInput
-                ref={seoImageRef}
-                disabled={loading}
-                onChange={(e) => {
-                  setData({ ...data, seoImageFile: e.target.files[0] });
-                }}
-              />
-            </div>
+            )}
           </div>
           {/* Measurements */}
           <p className="font-semibold text-xl">Measurements</p>
-          <div className="grid grid-cols-6 gap-4 pb-2 border-b-4 items-center">
+          <div className="grid grid-cols-5 gap-4 pb-2 border-b-4 items-center">
             <div className="">
               <div className="mb-2 block">
                 <Label value="Measurements" />
@@ -1107,28 +1046,6 @@ export default function Decor({}) {
                       measurements: {
                         ...data.productInfo.measurements,
                         other: e.target.value,
-                      },
-                    },
-                  });
-                }}
-                disabled={loading}
-              />
-            </div>
-            <div className="">
-              <div className="mb-2 block">
-                <Label value="Area(sq.ft)" />
-              </div>
-              <TextInput
-                type="number"
-                value={data.productInfo.measurements.area.toString()}
-                onChange={(e) => {
-                  setData({
-                    ...data,
-                    productInfo: {
-                      ...data.productInfo,
-                      measurements: {
-                        ...data.productInfo.measurements,
-                        area: parseInt(e.target.value),
                       },
                     },
                   });
@@ -1336,7 +1253,7 @@ export default function Decor({}) {
             ))}
           </div>
           {/* Product Variation */}
-          <p className="font-semibold text-xl">Product Variation</p>
+          <p className="font-semibold text-xl">Attributes</p>
           <div className="pb-2 border-b-4 flex flex-col gap-6">
             {/* Occasion */}
             {variationOptions.occassion.length > 0 && (
@@ -1489,7 +1406,7 @@ export default function Decor({}) {
             </div>
           </div>
           <p className="font-semibold text-xl">Quantity</p>
-          <div className="pb-2 border-b-4 grid grid-cols-5 gap-4 items-center">
+          <div className="pb-2 border-b-4 grid grid-cols-4 gap-4 items-center">
             {/* Unit */}
             <div>
               <div className="mb-2 block">
@@ -1504,27 +1421,6 @@ export default function Decor({}) {
                 }}
                 disabled={loading}
                 required
-              />
-            </div>
-            {/* SKU */}
-            <div>
-              <div className="mb-2 block">
-                <Label value="SKU" />
-              </div>
-              <TextInput
-                placeholder="SKU"
-                name="sku"
-                value={data.productInfo.SKU}
-                onChange={(e) => {
-                  setData({
-                    ...data,
-                    productInfo: {
-                      ...data.productInfo,
-                      SKU: e.target.value,
-                    },
-                  });
-                }}
-                disabled={loading}
               />
             </div>
             {/* Quantity */}
