@@ -335,6 +335,11 @@ export default function Decor({}) {
           ? ai.included
           : [""];
 
+      const tagsArr =
+        Array.isArray(ai.tags) && ai.tags.length > 0
+          ? ai.tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
+          : null;
+
       setData((prev) => ({
         ...prev,
         name: ai.name || prev.name,
@@ -342,6 +347,7 @@ export default function Decor({}) {
         productVisibility: true,
         productAvailability: true,
         thumbnailFile: prev.imageFile || prev.thumbnailFile,
+        tags: tagsArr || prev.tags,
         productInfo: {
           ...prev.productInfo,
           id: nextDecorId || prev.productInfo.id,
