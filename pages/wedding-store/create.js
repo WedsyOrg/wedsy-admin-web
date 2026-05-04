@@ -94,6 +94,18 @@ export default function Decor({}) {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [aiBanner, setAiBanner] = useState("");
   const [aiToast, setAiToast] = useState("");
+  // AI autofill is only available for these decor categories.
+  const AI_ENABLED_CATEGORIES = [
+    "stage",
+    "mandap",
+    "photobooth",
+    "pathway",
+    "nameboard",
+    "entrance arch",
+  ];
+  const showAiButton = AI_ENABLED_CATEGORIES.some((c) =>
+    data.category?.toLowerCase().includes(c)
+  );
   const imageRef = useRef();
   const thumbnailRef = useRef();
   const videoRef = useRef();
@@ -930,33 +942,37 @@ export default function Decor({}) {
                   setAiBanner("");
                 }}
               />
-              <button
-                type="button"
-                onClick={runAiAnalyze}
-                disabled={loading || isAnalyzing || !data.imageFile}
-                className={`text-sm font-medium px-3 py-2 rounded border transition-colors ${
-                  aiPhaseComplete
-                    ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200"
-                    : "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
-                } disabled:opacity-50`}
-              >
-                {isAnalyzing
-                  ? "Analysing image..."
-                  : aiPhaseComplete
-                  ? "✦ AI filled ✓"
-                  : "✦ AI autofill"}
-              </button>
-              {aiPhaseComplete && (
-                <button
-                  type="button"
-                  onClick={runAiRegenerate}
-                  disabled={loading || isRegenerating}
-                  className="text-sm font-medium px-3 py-2 rounded border bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 disabled:opacity-50"
-                >
-                  {isRegenerating
-                    ? "Regenerating..."
-                    : "↻ Regenerate name & description"}
-                </button>
+              {showAiButton && (
+                <>
+                  <button
+                    type="button"
+                    onClick={runAiAnalyze}
+                    disabled={loading || isAnalyzing || !data.imageFile}
+                    className={`text-sm font-medium px-3 py-2 rounded border transition-colors ${
+                      aiPhaseComplete
+                        ? "bg-green-100 text-green-800 border-green-300 hover:bg-green-200"
+                        : "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
+                    } disabled:opacity-50`}
+                  >
+                    {isAnalyzing
+                      ? "Analysing image..."
+                      : aiPhaseComplete
+                      ? "✦ AI filled ✓"
+                      : "✦ AI autofill"}
+                  </button>
+                  {aiPhaseComplete && (
+                    <button
+                      type="button"
+                      onClick={runAiRegenerate}
+                      disabled={loading || isRegenerating}
+                      className="text-sm font-medium px-3 py-2 rounded border bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 disabled:opacity-50"
+                    >
+                      {isRegenerating
+                        ? "Regenerating..."
+                        : "↻ Regenerate name & description"}
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <div>
